@@ -2,16 +2,47 @@
   (:require [chem.dictionaries :as dictionaries])
   (:require [chem.span-utils :as span-utils]))
 
+;; Using IUPAC prefix, infix, and suffix dictionaries find chemical names in input text
+
 (defn make-annotations [fragment text spanlist]
   (map (fn [span]
          (hash-map
           :fragment fragment
-          :term (.substring text (span :start) (span :end))
+          :text (.substring text (span :start) (span :end))
           :span span))
        spanlist))
 
+(defn consolidate-adjacent-annotations [first-annot second-annot]
+  "Consolidate adjacent chemical annotations
+
+   I.E. {:text \"polyethylene\"} {:text \"glycol\"} 
+        -> {:text \"polyethylene glycol\"}"
+  (hash-map :span {:start (:start (:span first-annot))
+                   :end   (:end   (:span second-annot))}
+            :term  (str (:term first-annot) " "
+                        (:term second-annot))
+            :fragmentlist [(:fragment first-annot) 
+                           (:fragment second-annot)]
+            :origin [first-annot second-annot]))
+
+(defn consolidate-annotations [annotation-list]
+  "find occurences of chemicals separated by one space and then consolidate them.
+   I.E. ... chemical chemical ... becomes ... chemical ..."
+  (if (> (count annotation-list) 1)
+    (loop [oldlist (vec (sort-by #(:start (:span %)) annotation-list))
+           newlist []]
+      (let [first-annot (first oldlist)
+            second-annot (second oldlist)]
+        (cond 
+         (<= (count oldlist) 1) newlist
+         :else (if (= (inc (:end (:span first-annot))) (:start (:span second-annot)))
+                 (recur (subvec oldlist 2) (conj newlist (consolidate-adjacent-annotations first-annot second-annot)
+                                                 first-annot second-annot))
+                 (recur (subvec oldlist 1) (conj newlist first-annot))))))
+    annotation-list))
+
 (defn get-annotations-using-dictionary [dictionary text]
-  (sort-by first 
+  (sort-by #(:start (:span %))
    (reduce (fn [newset fragment]
              (clojure.set/union newset (set 
                                         (make-annotations
@@ -27,11 +58,12 @@
            #{} dictionary)))
 
 (defn get-spans-from-annotations [annotationlist]
-  (set
-   (flatten
-    (map (fn [annotation]
-           (annotation :span))
-         annotationlist))))
+  (sort-by #(:start %)
+           (set
+            (flatten
+             (map (fn [annotation]
+                    (annotation :span))
+                  annotationlist)))))
 
 (defn get-terms-from-annotations [annotationlist]
   (set
@@ -45,8 +77,10 @@
             spanlist)))
 
 (defn partial-match [document]
-  (let [annotations (get-annotations-using-dictionary
-                     dictionaries/fragment-dictionary document)]
+  (let [annotations
+        (consolidate-annotations
+         (get-annotations-using-dictionary
+          dictionaries/fragment-dictionary document))]
     {:spans (get-spans-from-annotations annotations)
      :annotations annotations
      :matched-terms (get-terms-from-annotations annotations)}))
