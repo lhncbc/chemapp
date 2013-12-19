@@ -43,8 +43,7 @@
         (cond 
          (<= (count oldlist) 1) newlist
          :else (if (= (inc (:end (:span first-annot))) (:start (:span second-annot)))
-                 (recur (subvec oldlist 2) (conj newlist (consolidate-adjacent-annotations first-annot second-annot)
-                                                 first-annot second-annot))
+                 (recur (subvec oldlist 2) (conj newlist (consolidate-adjacent-annotations first-annot second-annot)))
                  (recur (subvec oldlist 1) (conj newlist first-annot))))))
     annotation-list))
 
