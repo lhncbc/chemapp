@@ -11,7 +11,7 @@
                  [compojure "1.1.5"]
                  [hiccup "1.0.3"]
                  [se.sics/prologbeans "4.2.1"]
-                 [gov.nih.nlm.nls/metamap-api "1.0-SNAPSHOT"]
+                 [gov.nih.nlm.nls/metamap-api "2.0pre-SNAPSHOT"]
                  [gov.nih.nlm.nls.lexicalsystems/lvg "2013"]
                  [migration/migration "1.0.0-SNAPSHOT"]
                  [clj-http "0.7.7"]
@@ -26,6 +26,7 @@
              {:dependencies
               [[org.clojure/data.xml "0.0.7"]
                [org.clojure/data.zip "0.1.1"]
+               [org.clojure/data.json "0.2.3"]
                [org.clojure/java.classpath "0.2.1"]
                [org.clojure/math.numeric-tower "0.0.2"]
                [org.clojure/tools.nrepl "0.2.3"]
