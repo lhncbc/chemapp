@@ -21,7 +21,14 @@
 ;;   :sources ["CHV" "CSP" "MSH" "MTH" "NCI" "NDFRT"], :overmatch false,
 ;;   :semtypes ["inch"], :conceptname "Calcium"})
 
-(defn api-instantiate [] (new MetaMapApiImpl))
+
+(defn api-instantiate 
+  ([] (comment (if (bound? #'*mmserver-hostname*)
+        (do
+          (print (str "mmserver hostname: " (deref #'*mmserver-hostname*)))
+          (new MetaMapApiImpl (deref #'*mmserver-hostname*)))))
+        (new MetaMapApiImpl))
+  ([hostname] (new MetaMapApiImpl hostname)))
 
 (defn process-string
   ([mmapi text]  (.processCitationsFromString mmapi text))
