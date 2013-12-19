@@ -29,10 +29,11 @@
                                 :port port)]
     (m/set-connection! conn)))
 
-(defn init []
-  (setup "127.0.0.1" 27017 "chem"))
+(defn init
+  ([] (setup "127.0.0.1" 27017 "chem"))
+  ([dbname] (setup "127.0.0.1" 27017 dbname)))
 
-(defn load-db-file [filename tablekeyword]
+(defn load-key-value-db-file [filename tablekeyword]
   (dorun
    (map (fn [lines-partition]
           (m/mass-insert!
@@ -44,6 +45,38 @@
                 lines-partition)))
         (partition-all 100 (line-seq (BufferedReader. (FileReader. filename)))))))
 
+(defn load-table-file [filename tablekeyword recfn]
+  "Load database using file and supplied record function.
+   Example:
+      (load-file \"training.txt\" :training-abstracts abstractfn)"
+  (dorun
+   (map (fn [lines-partition]
+          (m/mass-insert! 
+           tablekeyword
+           (map recfn 
+                lines-partition)))
+        (partition-all 100 (line-seq (BufferedReader. (FileReader. filename)))))))
+
+(defn load-db-record-seq 
+  "Load database using record sequence and supplied record function.
+   Example:
+      (load-db-record-seq training-record-seq :training.abstracts abstractfn)"
+   ([record-seq tablekeyword recfn]
+      (dorun
+       (map (fn [lines-partition]
+              (m/mass-insert! 
+               tablekeyword
+               (map recfn 
+                    lines-partition)))
+            (partition-all 100 record-seq))))
+   ([record-seq tablekeyword]
+      (dorun
+       (map (fn [lines-partition]
+              (m/mass-insert! 
+               tablekeyword
+               lines-partition))
+            (partition-all 100 record-seq)))))
+   
 ;; something like: (lookup :normchem "benzene")
 (defn lookup [dbkeyword term]
   (m/fetch dbkeyword :where {:key term}))
