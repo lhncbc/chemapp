@@ -1,8 +1,15 @@
 (ns chem.partial
   (:require [chem.dictionaries :as dictionaries])
-  (:require [chem.span-utils :as span-utils]))
+  (:require [chem.span-utils :as span-utils])
+  (:require [chem.rules :as rules])
+)
 
 ;; Using IUPAC prefix, infix, and suffix dictionaries find chemical names in input text
+
+(defn remove-terms-with-badendings [annotation-list]
+  (filter 
+   #(not (rules/has-badending? (:text %)))
+   annotation-list))
 
 (defn make-annotations [fragment text spanlist]
   (map (fn [span]
@@ -19,8 +26,8 @@
         -> {:text \"polyethylene glycol\"}"
   (hash-map :span {:start (:start (:span first-annot))
                    :end   (:end   (:span second-annot))}
-            :term  (str (:term first-annot) " "
-                        (:term second-annot))
+            :text  (str (:text first-annot) " "
+                        (:text second-annot))
             :fragmentlist [(:fragment first-annot) 
                            (:fragment second-annot)]
             :origin [first-annot second-annot]))
@@ -44,10 +51,12 @@
 (defn get-annotations-using-dictionary [dictionary text]
   (sort-by #(:start (:span %))
    (reduce (fn [newset fragment]
-             (clojure.set/union newset (set 
-                                        (make-annotations
-                                         fragment text
-                                          (span-utils/find-term-spanlist-with-target text fragment)))))
+             (clojure.set/union newset
+                                (set 
+                                 (remove-terms-with-badendings
+                                   (make-annotations
+                                    fragment text
+                                    (span-utils/find-term-spanlist-with-target text fragment))))))
            #{} dictionary)))
 
 (defn get-fragment-annotations-using-dictionary [dictionary text]
@@ -68,7 +77,7 @@
 (defn get-terms-from-annotations [annotationlist]
   (set
    (map (fn [annotation]
-          (annotation :term))
+          (annotation :text))
         annotationlist)))
 
 (defn get-fragments-from-spans [document spanlist]
