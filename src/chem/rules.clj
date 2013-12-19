@@ -66,8 +66,7 @@
   (> (count (mongodb/lookup :normchem word)) 0))
 
 
-(def badending-set #{"ing", "mic", "tion", "ed", "sis", "ism",
-     "coccus"})
+(def badending-set #{"ing", "mic", "tion", "ed", "sis", "ism", "coccus"})
 
 (defn has-badending-v1? [word]
   (and (not (or (= "glutamic" word) (= "polychlorinated" word)))
@@ -83,8 +82,10 @@
                       badending-set))))
     
 (defn has-badending? [word]
-  (some #(re-find (java.util.regex.Pattern/compile (format "%s$" %)) word)
-            badending-set))
+  (and (not (or (= "glutamic" word) (= "polychlorinated" word)))
+       (> (.length word) 6)
+       (some #(re-find (java.util.regex.Pattern/compile (format "%s$" %)) word)
+             badending-set)))
 
 (defn concat-token-text [token-list]
   (clojure.string/join (map #(second %) token-list)))
