@@ -15,8 +15,26 @@
   (doall
    (map 
     (fn [line]
-      (vec (.split line "\t")))
+      (let [fields (vec (.split line "\t"))]
+        (hash-map :docid    (java.lang.Integer/parseInt (nth fields 0))
+                  :title    (nth fields 1)
+                  :abstract (nth fields 2))))
     (line-seq (BufferedReader. (FileReader. filename))))))
+
+(defn mongodb-abstract-fields-recfn [fields]
+  "Each input record is of form [id title abstract] all are strings.
+   Records are loaded as {:docid id :title title :abstract abstract}
+
+   Use command below to load abstracts into mongodb:
+     (chem.mongodb/load-record-seq abstract-seq :tablename )
+     (require '[somnium.congomongo :as m])
+     (m/add-index! :tablename [:recid])"
+  (hash-map :docid    (java.lang.Integer/parseInt (nth fields 0))
+            :title    (nth fields 1)
+            :abstract (nth fields 2)))
+
+(defn mongodb-hash-recfn [record]
+  record)
 
 ;; 3) Training data annotations: 
 ;;
@@ -38,7 +56,13 @@
 (defn load-chemdner-annotations [filename]
   (map 
    (fn [line]
-     (vec (.split line "\t")))
+     (let [fields (vec (.split line "\t"))]
+       {:docid (java.lang.Integer/parseInt (nth fields 0))
+        :location  (nth fields 1)
+        :start (nth fields 2)
+        :end   (nth fields 3)
+        :text  (nth fields 4)
+        :chemtype  (nth fields 5)}))
    (line-seq (BufferedReader. (FileReader. filename)))))
 
 ;; 4) Training data Gold Standard file for the Chemical document
@@ -61,7 +85,9 @@
 (defn load-training-document-entity-gold-standard [filename]
   (map 
    (fn [line]
-     (vec (.split line "\t")))
+     (let [fields (vec (.split line "\t"))]
+       {:docid (java.lang.Integer/parseInt (nth fields 0))
+        :term (nth fields 1)}))
    (line-seq (BufferedReader. (FileReader. filename)))))
 
 ;; 5) Training data Gold Standard file for the Chemical entity mention
@@ -93,8 +119,16 @@
      (let [fields         (.split line "\t")
            pmid           (nth fields 0) 
            offset-triplet (vec (.split (nth fields 1) "\\:"))]
-       [pmid offset-triplet]))
+       {:pmid (java.lang.Integer/parseInt pmid)
+        :offset-triplet offset-triplet}))
    (line-seq (BufferedReader. (FileReader. filename)))))
+
+
+
+(defn gen-training-records-map [training-records]
+  (reduce (fn [newmap el]
+            (assoc newmap (:docid el) el))
+          {} training-records))
 
 ;; Additional comments
 ;; -------------------
