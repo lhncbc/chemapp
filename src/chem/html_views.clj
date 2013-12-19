@@ -4,7 +4,9 @@
         [hiccup.page]
         [hiccup.util])
   (:require [clojure.string :as string])
-  (:require [chem.annotations :as annot]))
+  (:require [chem.metamap-annotation :as mm-annot])
+  (:require [chem.annotations :as annot])
+  (:import (java.net URLDecoder URLEncoder)))
 
 (defn view-layout [title & content]
   (html
@@ -35,7 +37,7 @@
      [:input.action {:type "submit" :value "process"}]] ))
 
 (defn highlight-text-v1 [text annotations]
-  (let [matchedwordset (annot/build-matchedwordset-chemicals annotations)]
+  (let [matchedwordset (mm-annot/build-matchedwordset-chemicals annotations)]
     (vec 
      (cons :p
            (map (fn [word]
