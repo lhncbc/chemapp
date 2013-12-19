@@ -102,7 +102,7 @@
          (check-span span text))
        spanlist))
 
-(defn find-bounds-of-term [text index]
+(defn find-bounds-of-string [text index]
   "Find begining and end of term that has a character at index using
    whitespace as delimitors, punctuation other that whitespace is
    considered part of term.  Return begining and ending indexes as a
@@ -126,7 +126,7 @@
 (defn find-term-span-with-target [text target]
   (let [index (.indexOf text target)]
     (when (> index -1)
-      (find-bounds-of-term text index))))
+      (find-bounds-of-string text index))))
 
 (defn find-term-spanlist-with-target [text target]
   "Find begining and end of terms that has a character at index using
@@ -136,16 +136,60 @@
   (loop [spans []
          index (.indexOf text target)]
       (if (>= index 0)
-        (let [newspan (check-span (find-bounds-of-term text index) text)]
+        (let [newspan (check-span (find-bounds-of-string text index) text)]
+          (if (nil? newspan)
+            (recur spans (.indexOf text target (+ index (count target))))
+            (recur (conj spans newspan) (.indexOf text target (:end newspan)))))
+        spans)))
+
+
+(defn find-infix-spanlist-with-target [text target]
+  "Find begining and end of terms that has a character at index using
+   whitespace as delimitors, punctuation other that whitespace is
+   considered part of term.  Return list of spans for terms as a
+   vector of vector pairs."
+  (loop [spans []
+         index (.indexOf text target)]
+      (if (>= index 0)
+        (let [newspan (check-span (find-bounds-of-string text index) text)]
+          (if (nil? newspan)
+            (recur spans (.indexOf text target (+ index (count target))))
+            (recur (conj spans newspan) (.indexOf text target (:end newspan)))))
+        spans)))
+
+(defn find-prefix-spanlist-with-target [text target]
+  "Find begining and end of terms that has a character at index using
+   whitespace as delimitors, punctuation other that whitespace is
+   considered part of term.  Return list of spans for terms as a
+   vector of vector pairs."
+  (loop [spans []
+         index (.indexOf text target)]
+      (if (>= index 0)
+        (let [newspan (check-span (find-bounds-of-string text index) text)]
+          (if (nil? newspan)
+            (recur spans (.indexOf text target (+ index (count target))))
+            (recur (conj spans newspan) (.indexOf text target (:end newspan)))))
+        spans)))
+
+(defn find-suffix-spanlist-with-target [text target]
+  "Find begining and end of terms that has a character at index using
+   whitespace as delimitors, punctuation other that whitespace is
+   considered part of term.  Return list of spans for terms as a
+   vector of vector pairs."
+  (loop [spans []
+         index (.indexOf text target)]
+      (if (>= index 0)
+        (let [newspan (check-span (find-bounds-of-string text index) text)]
           (if (nil? newspan)
             (recur spans (.indexOf text target (+ index (count target))))
             (recur (conj spans newspan) (.indexOf text target (:end newspan)))))
         spans)))
 
 (defn find-fragment [text target]
+  "find target-text (a fragment) in supplied text."
   (loop [spans []
          index (.indexOf text target)]
-      (if (>= index 0)
+      (if (and (>= index 0) (< index (count text)))
         (let [newspan (hash-map :start index :end (+ index (count target)))]
           (recur (conj spans newspan) (.indexOf text target (:end newspan))))
         spans)))
