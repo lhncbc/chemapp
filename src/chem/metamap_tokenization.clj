@@ -19,7 +19,7 @@
 (def nuprog (re-pattern #"^[0-9]+$"))
 
 
-(defn classify_token [token]
+(defn classify-token [token]
   "What are the classes?:
     <ws> - whitespace
     <an> - alphanumeric
@@ -38,6 +38,28 @@
    (re-find nuprog token) "nu"
    :else "unknown")
   )
+
+(defn make-map-tokenlist [tokenlist]
+  "Convert string tokens to map tokens, each token of the form:
+    {:text <text>}"
+  (map #(hash-map :text %) tokenlist))
+
+(defn add-positional-info [atokenlist]
+  (loop [i 0 
+         tokenlist atokenlist 
+         newtokenlist []]
+    (let [token  (first tokenlist)
+          tokentext {:text token}]
+      (if (empty? tokenlist)
+        newtokenlist
+        (recur (+ i (count tokentext)) 
+               (rest tokenlist) 
+               (conj newtokenlist (conj token {:position i})))))))
+
+(defn classify-tokens [tokenlist]
+  (map (fn [token]
+         (conj token {:class (classify-token (:text token))}))
+       tokenlist))
 
 (defn tokenize-text-utterly [fieldtext tokfields]
 
