@@ -66,7 +66,7 @@
   (> (count (mongodb/lookup :normchem word)) 0))
 
 
-(def badending-set #{"ing", "mic", "tion", "ed", "sis", "ism", "coccus"})
+(def badending-set #{"ing", "mic", "tion", "ed", "sis", "ism", "coccus" "ment"})
 
 (defn has-badending-v1? [word]
   (and (not (or (= "glutamic" word) (= "polychlorinated" word)))
