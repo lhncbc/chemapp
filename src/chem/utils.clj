@@ -1,4 +1,5 @@
 (ns chem.utils
+  (:use [clojure.pprint])
   (:import (java.io BufferedReader FileReader))
   (:gen-class))
 
@@ -52,6 +53,25 @@
   (with-open [w (java.io.FileWriter. outfilename)]
     (.write w astr)))
 
+(defn pprint-object-to-file [filename object]
+  "pretty print object to file."
+  (with-open [w (java.io.FileWriter. filename)]
+    (pprint object w)))
+
+(defn pr-object-to-file [filename object]
+  "print object readably to file."
+  (with-open [w (java.io.FileWriter. filename)]
+    (.write w (pr-str object))))
+
+;; read wants its reader arg (or *in*) to be a java.io.PushbackReader.
+;; with-open closes r after the with-open body is done.  *read-eval*
+;; specifies whether to allow #=() forms when reading, and evaluate
+;; them as a side effect while reading.
+(defn read-from-file-with-trusted-contents [filename]
+  (with-open [r (java.io.PushbackReader.
+                 (clojure.java.io/reader filename))]
+    (binding [*read-eval* false]
+      (read r))))
 
 ;; Winnowing a Sequence
 ;; Problem
