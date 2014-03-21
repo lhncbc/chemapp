@@ -3,7 +3,7 @@
   :url "http://chemer.nlm.nih.gov/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.4.0"]
+  :dependencies [[org.clojure/clojure "1.5.1"]
                  [instaparse "1.2.2"]
                  [rhizome "0.1.9"]
                  [ring/ring-core "1.1.8"]
@@ -16,9 +16,12 @@
                  [migration/migration "1.0.0-SNAPSHOT"]
                  [clj-http "0.7.7"]
                  [congomongo "0.4.1"]
+                 [com.novemberain/monger "1.7.0"]
                  [instaparse "1.2.2"]
                  [rhizome "0.1.9"]
-                 [cc.mallet/mallet "2.0.7"]]
+                 [cc.mallet/mallet "2.0.7"]
+                 [log4j/log4j "1.2.17"]
+                 [uk.ac.cam.ch.opsin/opsin-core "1.5.0"]]
   :plugins [[lein-ring "0.8.3"]]
   :ring {:init chem.backend/init
          :handler chem.core/app}
