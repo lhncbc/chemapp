@@ -1,4 +1,5 @@
 (ns chem.span-utils
+  (:require [chem.annotations :as annot])
   (:require [chem.dictionaries :as dictionaries])
   (:require [chem.stopwords :as stopwords])
   (:gen-class))
@@ -242,10 +243,13 @@
   (map (fn [span] (list (subs text (:start span) (:end span)) span)) spanlist))
 
 (defn concat-spans [record annotator-keyword-list result-keyword]
-  (sort-by :start (into [] (set (apply concat 
-                                    (map (fn [annotator-keyword]
-                                           (:spans ((record annotator-keyword) result-keyword)))
-                                         annotator-keyword-list))))))
+  (sort-by :start 
+           (into [] 
+                 (set (apply concat 
+                             (map (fn [annotator-keyword]
+                                    (annot/get-spans-from-annotations
+                                     (-> record annotator-keyword result-keyword :annotations)))
+                                  annotator-keyword-list))))))
 
 ;; if (start_1 >= start_n) and (end_1 <= end_n)
 (defn is-span-subsumed? [span spanlist]

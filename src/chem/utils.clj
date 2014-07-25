@@ -1,52 +1,55 @@
 (ns chem.utils
   (:use [clojure.pprint])
-  (:import (java.io BufferedReader FileReader))
+  (:import (java.io BufferedReader FileReader FileWriter))
+  (:require [clojure.data.json :as json])
   (:gen-class))
+
+;; ## Various utility functions
 
 (defn line-seq-from-file [file-name]
   " return a lazy seq of lines from supplied filename"
   (line-seq (BufferedReader. (FileReader. file-name))))
 
-(defn print-elements-delimited [coll  delimiter]      
-  (count                            
-   (doall                         
-    (map                          
+(defn print-elements-delimited [coll  delimiter]
+  (count
+   (doall
+    (map
      #(prn (format "%s" (apply str (interpose delimiter %))))
      coll))))
 
-(defn write-elements-delimited [outfilename coll delimiter]    
-  (count                            
-   (with-open [w (java.io.FileWriter. outfilename)]   
-     (doall                         
-      (map                          
+(defn write-elements-delimited [outfilename coll delimiter]
+  (count
+   (with-open [w (java.io.FileWriter. outfilename)]
+     (doall
+      (map
        #(.write w (format "%s\n" (apply str (interpose delimiter %))))
        coll)))))
 
-(defn print-elements-piped [coll]   
-  (count       
-   (doall    
-    (map     
-     #(prn (format "%s" (apply str (interpose \| %))))       
+(defn print-elements-piped [coll]
+  (count
+   (doall
+    (map
+     #(prn (format "%s" (apply str (interpose \| %))))
      coll))))
 
-(defn write-elements-piped [outfilename coll]         
-  (count       
-   (with-open [w (java.io.FileWriter. outfilename)]   
-     (doall    
-      (map     
+(defn write-elements-piped [outfilename coll]
+  (count
+   (with-open [w (java.io.FileWriter. outfilename)]
+     (doall
+      (map
        #(.write w (format "%s\n" (apply str (interpose \| %))))
-       coll)))))                    
+       coll)))))
 
-(defn print-interns [package]       
-  (count (map prn (ns-interns package))))             
+(defn print-interns [package]
+  (count (map prn (ns-interns package))))
 
-(defn print-elements [coll]         
-  (count (map prn coll)))           
+(defn print-elements [coll]
+  (count (map prn coll)))
 
-(defn write-elements [outfilename coll]               
-  (count       
-   (with-open [w (java.io.FileWriter. outfilename)]   
-     (doall                  
+(defn write-elements [outfilename coll]
+  (count
+   (with-open [w (java.io.FileWriter. outfilename)]
+     (doall
       (map #(.write w (format "%s\n" %)) coll)))))
 
 (defn write-to-file [outfilename astr]
@@ -59,9 +62,8 @@
     (pprint object w)))
 
 (defn pr-object-to-file [filename object]
-  "print object readably to file."
-  (with-open [w (java.io.FileWriter. filename)]
-    (.write w (pr-str object))))
+  "print object in edn format to file."
+  (spit filename (pr-str object)))
 
 ;; read wants its reader arg (or *in*) to be a java.io.PushbackReader.
 ;; with-open closes r after the with-open body is done.  *read-eval*
@@ -73,7 +75,8 @@
     (binding [*read-eval* false]
       (read r))))
 
-;; Winnowing a Sequence
+;; ## Winnowing a Sequence
+;;
 ;; Problem
 
 ;; How do I separate the elements of a sequence into those which
@@ -115,5 +118,63 @@
   (let [pvs (map #(vector (pred %) %) coll)]
     [(for [[p v] pvs :when p] v)
      (for [[p v] pvs :when (not p)] v)]))
+
+
+(defn nth-vals* [a i m]
+  (if (and (map? m) (> i 0))
+    (reduce into a (map (fn [v] (nth-vals* a (dec i) v)) (vals m)))
+    (conj a m)))
+
+(defn nth-vals [i m]
+  (if (nil? m)
+    {}
+    (nth-vals* [] i m)))
+
+;; One way to convert an UTF-8 string to ascii
+;;    String utf = "Some UTF-8 String";
+;;    byte[] data = utf.getBytes("ASCII");
+;;    String ascii = new String(data);
+
+(defn utf8-to-ascii [text]
+  (String. (.getBytes text "ASCII")))
+
+;; (defn utf8-to-metamap-ascii [text]
+;;   (String. (.getBytes text "ASCII")))
+
+(defn numkeyword [num]
+  "Convert number into a keyword"
+  (keyword (format "%d" num)))
+
+(defn maybe-string-to-seq [element]
+  "if element is a string convert it to a sequence else return it."
+  (case (type element)
+    java.lang.String              (re-seq #"[^:]+" element)
+    clojure.lang.PersistentVector element
+    clojure.lang.PersistentList   element
+    element))
+
+(defn maybe-string-to-primitive [element]
+  (case (type element)
+   java.lang.String    (read-string element)
+   java.lang.Long      element
+   java.lang.Integer   element
+   clojure.lang.BigInt element
+   java.lang.Double    element
+   clojure.lang.Ratio  element
+   element))
+
+(defn maybe-seq-to-piped-string
+ ([element] (maybe-seq-to-piped-string element " "))
+ ([element delimiter]
+    (case (type element)
+      java.lang.String              element
+      (clojure.string/join delimiter element))))
+
+(defn list-matching-ns [parent]
+  (filter #(re-matches (re-pattern (format "%s.*" parent)) (str %)) (all-ns)))
+
+(defn write-json-to-file [outfilename obj]
+  (spit outfilename (json/write-str obj)))
+  
 
 ;;fin

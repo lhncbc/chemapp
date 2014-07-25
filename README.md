@@ -30,7 +30,6 @@ FIXME: listing of options this app accepts.
 
 ...
 
-
 ## Mallet
 
 see scripts/setup.clj, src/chem/setup.clj, src/chem/paths.clj and 
@@ -62,6 +61,10 @@ bc-evaluate chemdner-resultlist.txt /nfsvol/nlsaux16/II_Group_WorkArea/Lan/proje
 To evaluate using development-set for testing:
 
 bc-evaluate chemdner-resultlist.txt /nfsvol/nlsaux16/II_Group_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER_DEVELOPMENT_V02/cdi_ann_development_13-08-18.txt
+
+To evaluate:
+
+bc-evaluate subsume-chemdner-resultlist.txt /nfsvol/nlsaux16/II_Group_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER_TRAIN_V01/cdi_ann_training_13-07-31.txt
 
 ### Bugs
 

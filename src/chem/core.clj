@@ -3,13 +3,15 @@
         [hiccup.core]
         [hiccup.page]
         [hiccup.util]
-        [clojure.pprint]
         [ring.middleware.params :only [wrap-params]]
+        [clojure.pprint]
         [chem.html-views])
-  (:require [chem.process :as process])
-  (:require [chem.utils :as utils])
-  (:require [chem.annotations :as annot])
-  (:require [clojure.string :as string])
+  (:require [chem.process :as process]
+            [chem.utils :as utils]
+            [chem.annotations :as annot]
+            [chem.chemdner-tools :as chemdner-tools]
+            [chem.pipeline :as pipeline]
+            [clojure.string :as string])
   (:import (java.net URLDecoder URLEncoder))
   (:gen-class))
 
@@ -17,21 +19,32 @@
   "I don't do a whole lot ... yet."
   [& args]
   (println "Chemical Annotator")
-  (println (str "input files: " (string/join args)))
-  (dorun 
+  (println (str "chemdner input files: " (string/join args)))
+  (pprint
    (map (fn [arg]
-          (let [document (string/join "\n " (utils/line-seq-from-file arg))
-                result (process/process "metamap" document)
-                annotationlist {:annotations result}
-                spans {:spans result}]
-            (println (annot/annotate-text document spans "{" "}" ""))
-            (pprint  [:annotations annotationlist])  ))
+          (let [document-list (chemdner-tools/load-chemdner-abstracts arg)
+                annot-result-list (pipeline/annotate-document-set document-list "metamap")]
+            
+            ))
         args)))
 
 (defroutes 
   viewer-routes
   (GET "/" []
        (frontpage))
-  (POST "/process/" [document engine]
-        (view-output document engine (process/process engine document))) )
+
+  (GET "/adhoc/" []
+       (adhoc-page))
+
+  (GET "/chemdner/" []
+       (chemdner-page))
+
+  (GET "/chemdner/:docid/" [docid]
+       (view-chemdner-output docid))
+
+  (POST "/adhoc/process/" [document engine]
+        (view-adhoc-output document engine (process/process engine document))))
+
 (def app (wrap-params viewer-routes))
+
+

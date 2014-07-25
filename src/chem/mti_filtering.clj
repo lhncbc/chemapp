@@ -1,4 +1,6 @@
 (ns chem.mti-filtering
+  (:use [clojure.set :only [intersection]])
+  (:require [chem.utils])
   (:require [chem.rrf-mongodb :as rrfdb])
   (:require [somnium.congomongo :as m]))
 
@@ -20,7 +22,7 @@
 ;; A single chemical structure diagram: single atoms, ions, isotopes,
 ;; pure elements and molecules:
 
-(def element-cuis
+(def is-element?
   #{ "C0016330"                         ; Fluorine
      "C0302583"                         ; Iron
      "C0011744"                         ; Deuterium
@@ -45,20 +47,18 @@
                                         ; Others?
      })
 
-(defn is-element? [cui] (contains? element-cuis cui))
-
 ;; P3. Small Biochemicals
 ;; -Sacharids: monosaccharides, disaccharides and trisaccharides should be tagged.
 
 ;; object side of relation in MRREL "cui1" (I believe)
-(def small-biochemicals-isa-object-cuis
+(def small-biochemicals-isa-object-cuiset
   ^{:doc "concepts for monosaccharides, disaccharides, or aminoglycosides (aminoglycoside trisaccharides)." }
   #{ "C0026492"                         ; "monosaccharide"
      "C0012611"                         ; "disaccharide"
      "C0002556"                         ; "aminoglycoside" (aminoglycoside trisaccharide)
     })
 
-(def small-biochemical-cuis 
+(def is-small-biochemical?
   ^{:doc "cuis that are marked as monosaccharides, disaccharides, or aminoglycosides (aminoglycoside trisaccharides)." }
   #{"C0977110" "C0978023" "C0019494" "C0977122" "C0977112" "C0977113"
     "C0027780" "C0978026" "C0776374" "C0013283" "C0776375" "C0041080"
@@ -76,43 +76,94 @@
     "C0687829" "C0023726" "C0022637" "C0682934" "C0022957" "C0262967"
     "C0022949" "C0040815"})
 
-(defn is-small-biochemical? [cui] (contains? small-biochemical-cuis cui))
-
-(def peptide-cuis
-  ^{:doc "concepts that are peptides (cui: C0030956)" }
+(def is-peptide?
+  ^{:doc "concepts that are peptides (C0030956), Peptidomimetics  (C2936235)" }
   #{"C1512030" "C1513311" "C0211011" "C1997653" "C2585265" "C0036774"
     "C0017953" "C1305923" "C0582246" "C0304925" "C0012512" "C0486843"
     "C0991769" "C0033603" "C1291124" "C2986708" "C0001924" "C1291125"
     "C0293227" "C0251515" "C0030957" "C1519061"})
 
-(defn is-peptide? [cui] (contains? peptide-cuis cui))
-
-(def nucleotide-cuis
+(def is-nucleotide?
   ^{:doc "concepts that are nucleotides (cui: C0028630)" }
   #{"C0207164" "C0027270" "C0018340" "C0018353" "C0057470" "C0001480"
     "C0009226" "C2827108" "C0028953" "C0027303" "C0032550" "C0001465"
     "C0035548" "C0011529"})
 
-(defn is-nucleotide? [cui] (contains? nucleotide-cuis cui))
 
-(def polymer-cuis
+(def is-polymer?
   ^{:doc "concepts that are Polymers (cui: C0032521)"}
   #{"C0596383" "C0005554" "C0005533" "C0032483" "C0032167" "C0440257"
     "C1720305" "C1563732" "C1881413" "C0068943" "C0071443" "C0032602"
     "C0032856" "C1881507" "C0175905" "C0616192"})
 
-(defn is-polymer? [cui] (contains? polymer-cuis cui))
+;; hydrocarbons: C0020242
+
+(def hydrocarbon-cuis 
+  #{ "C0001052" "C0001555" "C0001688" "C0001975" "C0001992" "C0002065"
+     "C0002068" "C0002078" "C0002482" "C0002483" "C0002508" "C0002520"
+     "C0003030" "C0003139" "C0003162" "C0004471" "C0004492" "C0004501"
+     "C0005036" "C0005097" "C0005768" "C0006031" "C0006469" "C0006474"
+     "C0006926" "C0007004" "C0007066" "C0007269" "C0007807" "C0007987"
+     "C0008267" "C0008722" "C0008903" "C0010503" "C0010554" "C0010566"
+     "C0010579" "C0011933" "C0012018" "C0013557" "C0014898" "C0014969"
+     "C0014996" "C0016693" "C0016792" "C0017109" "C0017113" "C0019225"
+     "C0019398" "C0019665" "C0020233" "C0020242" "C0020243" "C0020245"
+     "C0020248" "C0020250" "C0020926" "C0020930" "C0020931" "C0022189"
+     "C0022611" "C0022634" "C0022947" "C0023779" "C0025520" "C0025617"
+     "C0025732" "C0026156" "C0027375" "C0028125" "C0028131" "C0028137"
+     "C0028138" "C0028199" "C0028606" "C0028621" "C0028622" "C0028822"
+     "C0029036" "C0029224" "C0029252" "C0029254" "C0030415" "C0030866"
+     "C0031180" "C0031262" "C0031328" "C0031367" "C0031428" "C0032344"
+     "C0033434" "C0033684" "C0034435" "C0034526" "C0036620" "C0037638"
+     "C0038137" "C0038317" "C0038515" "C0038776" "C0038849" "C0039561"
+     "C0039672" "C0039795" "C0040383" "C0040384" "C0040539" "C0040875"
+     "C0041942" "C0042037" "C0043367" "C0043801" "C0044507" "C0045574"
+     "C0046453" "C0050962" "C0052401" "C0052558" "C0054303" "C0056587"
+     "C0056763" "C0057229" "C0058209" "C0058515" "C0059792" "C0061261"
+     "C0062618" "C0062784" "C0064979" "C0066315" "C0068008" "C0068407"
+     "C0072221" "C0072229" "C0072662" "C0076271" "C0079107" "C0079164"
+     "C0085153" "C0120269" "C0127787" "C0162344" "C0162574" "C0162990"
+     "C0163070" "C0206126" "C0207871" "C0243192" "C0244950" "C0263249"
+     "C0301021" "C0301023" "C0301024" "C0301025" "C0301026" "C0301027"
+     "C0301028" "C0301030" "C0301031" "C0301032" "C0301070" "C0302917"
+     "C0303743" "C0303758" "C0303762" "C0303766" "C0303768" "C0303769"
+     "C0303770" "C0303771" "C0303772" "C0303773" "C0303774" "C0303775"
+     "C0303776" "C0303777" "C0303778" "C0303779" "C0303780" "C0303781"
+     "C0303848" "C0369760" "C0387841" "C0439893" "C0439919" "C0439931"
+     "C0439946" "C0440257" "C0443602" "C0457019" "C0551401" "C0551429"
+     "C0551430" "C0551431" "C0556613" "C0576728" "C0576788" "C0576797"
+     "C0596258" "C0596399" "C0596646" "C0596913" "C0597142" "C0597700"
+     "C0608758" "C0612655" "C0613006" "C0614310" "C0614804" "C0618319"
+     "C0651340" "C0654359" "C0678458" "C0678459" "C0678462" "C0682915"
+     "C0682921" "C0682925" "C0682932" "C0682954" "C0682987" "C0682996"
+     "C0699863" "C0729428" "C0799498" "C0882503" "C0965494" "C1100802"
+     "C1120553" "C1135621" "C1257836" "C1454263" "C1454265" "C1504614"
+     "C1522005" "C1524024" "C1524059" "C1576846" "C1706766" "C1741169"
+     "C2220469" "C2350439" "C2604917" "C3495387" })
+
+
+;; Benzene derivative hydrocarbon: C1289934 
+
+(def benzene-derivative-hydrocarbon-cuiset
+  #{"C0005036" "C0020245" "C0039562" "C0040383" "C0043367"
+    "C0047506" "C0047805" "C0058515" "C0059792" "C0161687"
+    "C0301030" "C0303772" "C0303773" "C0303778" "C0303779"
+    "C0303808" "C1289934"})
 
 (def mineral-cuis
+  ^{:doc "concepts that are Mineral (cui: C0026162)"}
   #{ } )
 
 
-(def organic-nitrogen-compound-cuis
-  #{ "C0042523" } )
+(def organic-nitrogen-compound-cuiset
+  ^{:doc "Organic nitrogen compound (cui: C0576728)"}
+  #{ "C0042523" "C0029224" } )
 
 (def laboratory-reagents-cuis #{ })
 (def dye-and-indicator-name-cuis  #{ })
 
+(def chemical-classes
+  #{ :element :small-biochemical :peptide :nucleotide :polymer :mineral })
 
 (defn semantic-types-records-for-cui [cui]
   (m/fetch :mrsty :where {:cui cui}))
@@ -144,8 +195,11 @@
 (defn is-excluded-chemical [record]
   (< 0 (count (list-exclude-semtypes-for-record record))))
 
+(defn is-small-biochemical-cui [cui]
+  (is-small-biochemical? cui))
+
 (defn is-small-biochemical [record]
-  (contains? small-biochemical-cuis (:cui record)))
+  (is-small-biochemical? (:cui record)))
 
 (defn is-from-mmi [record]
   (contains? (set (:paths record)) "MM"))
@@ -156,13 +210,21 @@
 (defn is-from-mmi-rc [el]
   (= (set (:paths el)) (set ["RC" "MM"])))
 
+(defn is-chemical-cui? [cui]
+  (or (is-small-biochemical? cui)
+      (is-peptide? cui)
+      (is-nucleotide? cui)
+      (is-polymer? cui)
+      (is-element? cui)
+      ))
+
 (defn is-chemical? [record]
   (and (is-from-mmi record)
-       (or (is-small-biochemical record)
-           (contains? peptide-cuis (:cui record))
-           (contains? nucleotide-cuis (:cui record))
-           (contains? polymer-cuis (:cui record))
-           (contains? element-cuis (:cui record))
+       (or (is-small-biochemical? record)
+           (is-peptide? (:cui record))
+           (is-nucleotide? (:cui record))
+           (is-polymer? (:cui record))
+           (is-element? (:cui record))
            )))
 
 ;; (and (not (is-excluded-chemical record))
@@ -187,7 +249,7 @@
   (filter #(not (nil? %))
           (map (fn [fields]
                  (when (>= (.indexOf (nth fields 1) ":") 0)
-                   {:docid (nth fields 0)
+                   {:docid (java.lang.Integer/parseInt (nth fields 0))
                     :rank (vec (.split (nth fields 1) "\\:" -1))
                     :term (nth fields 2)
                     :cui (nth fields 3)
@@ -271,6 +333,32 @@
   "count number of results that include both Related Citations and MetaMap Indexing"
   (count (filter is-from-mmi-rc mti-resultseq)))
 
+(defn lowercase-set [string-set] (set (map clojure.string/lower-case string-set)))
+
+(defn gen-intersection-of-term-maps [term-map0 term-map1]
+  (into {} (map (fn [key]
+                  [key (clojure.set/intersection (lowercase-set (term-map0 key))
+                                                 (lowercase-set (term-map1 key)))])
+                (clojure.set/intersection (set (keys term-map0)) (set (keys term-map1))))))
+
+(defn list-found-and-gold [gold-term-map test-term-map]
+  (map (fn [key]
+         (if (contains? test-term-map key)
+           [key [(clojure.set/intersection (lowercase-set (gold-term-map key))
+                                           (lowercase-set (test-term-map key)))
+                 (lowercase-set (gold-term-map key))]]
+           [key [0 (lowercase-set (gold-term-map key))]]))
+       (keys gold-term-map)))
+
+(defn list-found [gold-term-map test-term-map]
+  (map (fn [key]
+         (if (contains? test-term-map key)
+           [key [(count (clojure.set/intersection (lowercase-set (gold-term-map key))
+                                                  (lowercase-set (test-term-map key))))
+                 (count (lowercase-set (gold-term-map key)))]]
+           [key [0 (count (lowercase-set (gold-term-map key)))]]))
+       (keys gold-term-map)))
+
 ;; user> (def mti-full-detailed-resultseq (chem.mti-filtering/gen-mti-full-detailed-resultseq "chemdner_abs_training.sldiwi.ascii.mti.noAddForced.out"))
 ;; 'user/mti-full-detailed-resultseq
 ;; user> (nth mti-full-detailed-resultseq 0)
@@ -281,7 +369,6 @@
 ;; 15886
 ;; user> (first chemdner-gold)
 ;; {:docid "21826085", :term "haloperidol"}
-
 ;; user> (def mti-filtered-resultseq (chem.mti-filtering/filter-mti-results mti-full-detailed-resultseq))
 ;; #'user/mti-filtered-resultseq
 ;; user> (first mti-full-detailed-resultseq)
@@ -293,7 +380,7 @@
 ;; #'user/chemdner-gold-map
 ;; user> (def mti-filtered-term-map (chem.mti-filtering/gen-training-annotations-map mti-filtered-resultseq))
 ;; #'user/mti-filtered-term-map
-;; user> (def mti-term-map (chem.mti-filtering/gen-training-annotations-map mti-resultseq))
+;; user> (def mti-term-map (chem.mti-filtering/gen-training-annotations-map mti-filtered-resultseq))
 ;; #'user/mti-term-map
 ;; user> (chemdner-gold-map "23104419")
 ;; #{"lactate" "estradiol" "creatine" "testosterone" "androgen" "Androgen" "methimazole"}

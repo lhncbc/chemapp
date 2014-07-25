@@ -5,11 +5,16 @@
   (:require [chem.partial :as partial])
   (:require [chem.normchem :as normchem]))
 
+(defn combine [annotator1 annotator2 document]
+  (let [result0 (annotator1 document)
+        result1 (annotator2 document)]
+    (hash-map
+        :annotations (concat (result0 :annotations) (result1 :annotations)))))
+
 (defn combination-1 [document]
-  (let [result0 (partial/partial-match document)
+  (let [result0 (partial/match document)
         result1 (normchem/process-document document)]
     (hash-map
-        :spans (concat (result0 :spans) (result1 :spans))
-        :annotations (concat (result0 :annotations) (result1 :annotations))
-        :matched-terms (concat (result0 :matched-terms) (result1 :matched-terms)))))
+        :annotations (concat (result0 :annotations) (result1 :annotations)))))
+
 

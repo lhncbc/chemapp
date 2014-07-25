@@ -1,4 +1,5 @@
 (ns chem.metamap-api
+  (:use [chem.utils])
   (:import (gov.nih.nlm.nls.metamap MetaMapApiImpl PCM Phrase))
   (:gen-class))
 
@@ -37,6 +38,10 @@
        (.setOptions mmapi options))
      (.processCitationsFromString mmapi text)))
 
+(defn process-utf8-string 
+  "Convert string to ASCII before sending it to MetaMap."
+  ([mmapi text]         (process-string mmapi(utf8-to-ascii text)))
+  ([mmapi text options] (process-string mmapi (utf8-to-ascii text) options)))
 
 (defn gen-restrict-to-semtype-option [semtype-list]
   (format "--restrict_to_sts %s" (clojure.string/join "," semtype-list)))
