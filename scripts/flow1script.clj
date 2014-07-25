@@ -8,6 +8,9 @@
   (:import [java.io File])
   (:use [chem.utils]))
 
+
+(load-file "scripts/setupannotators.clj")
+
 ;; load saved partial match results
 (let [fname "/rhome/wjrogers/studio/clojure/chem/partial-match-records.readable"]
   (def partial-match-records 
@@ -25,7 +28,7 @@
       ;; load saved metamap results
       (read-from-file-with-trusted-contents fname)
       ;; generate metamap results
-      (let [records (map #(chem.process/add-metamap-annotations mmapi %)
+      (let [records (map #(chem.process/add-metamap-annotations mmapi-inst %)
                          training-records)]
         (pr-object-to-file fname records)
         records))))
@@ -44,29 +47,29 @@
         (pr-object-to-file fname records)
         records))))
 
-;; (def flow1-chemdner-resultlist (eval/gen-flow1-chemdner-resultlist flow1-records))
+(def flow1-chemdner-resultlist (eval/gen-flow1-chemdner-resultlist flow1-records))
 ;; (eval/write-chemdner-resultlist-to-file "flow1-chemdner-resultlist.txt" flow1-chemdner-resultlist)
-;; (def metamap-chemdner-resultlist (eval/gen-metamap-chemdner-resultlist metamap-records))
+(def metamap-chemdner-resultlist (eval/gen-metamap-chemdner-resultlist metamap-records))
 ;; (eval/write-chemdner-resultlist-to-file "metamap-chemdner-resultlist.txt" metamap-chemdner-resultlist)
-;; (def partial-chemdner-resultlist (eval/gen-partial-chemdner-resultlist metamap-records))
+(def partial-chemdner-resultlist (eval/gen-partial-chemdner-resultlist metamap-records))
 ;; (eval/write-chemdner-resultlist-to-file "partial-chemdner-resultlist.txt" partial-chemdner-resultlist)
-;; (def metamap-partial-chemdner-resultlist (eval/gen-partial-chemdner-resultlist metamap-partial-records))
-(eval/write-chemdner-resultlist-to-file "metamap-partial-chemdner-resultlist.txt" metamap-partial-chemdner-resultlist)
-;; (def metamap-partial-chemdner-subsume-resultlist (eval/gen-partial-chemdner-subsume-resultlist metamap-partial-subsume-records))
-(eval/write-chemdner-resultlist-to-file "metamap-partial-chemdner-subsume-resultlist.txt" metamap-partial-subsume-chemdner-resultlist)
+(def metamap-partial-chemdner-resultlist (eval/gen-metamap-partial-chemdner-resultlist metamap-partial-records))
+;; (eval/write-chemdner-resultlist-to-file "metamap-partial-chemdner-resultlist.txt" metamap-partial-chemdner-resultlist)
+;; (def metamap-partial-chemdner-subsume-resultlist (eval/gen-metamap-partial-subsume-chemdner-resultlist metamap-partial-subsume-records))
+;; (eval/write-chemdner-resultlist-to-file "metamap-partial-chemdner-subsume-resultlist.txt" metamap-partial-subsume-chemdner-resultlist)
 
 ;; remove subsumed terms from termlists
-(def subsume-flow-records (map chem.process/subsume-flow flow1-records))
+;; (def subsume-flow-records (map chem.process/subsume-flow flow1-records))
 
 ;; convert to chemdner format
 ;; (def subsume-chemdner-resultlist (apply concat (map #(eval/doc-result-to-chemdner-result % :subsume-matched-terms) subsume-flow-records)))
 
 ;; (eval/write-chemdner-resultlist-to-file "subsume-chemdner-resultlist.txt" subsume-chemdner-resultlist)
 
-(def metamap2-records (map chem.process/regenerate-metamap-spans metamap-records))
-(def metamap2-partial-records (map #(conj %1 %2) flow1-records metamap2-records))
+;; (def metamap2-records (map chem.process/regenerate-metamap-spans metamap-records))
+;; (def metamap2-partial-records (map #(conj %1 %2) flow1-records metamap2-records))
 
-(def subsume2-records (map-flow metamap2-partial-records subsume-flow))
+;; (def subsume2-records (map-flow metamap2-partial-records subsume-flow))
 
 ;; convert to chemdner format
 ;; (def subsume2-chemdner-resultlist (apply concat (map #(eval/doc-result-to-chemdner-result % :subsume-matched-terms) subsume2-records)))
@@ -75,4 +78,4 @@
 
 ;; 
 
-(def subsume2-eval-records (map #(eval/add-wrong-missing % :subsume-matched-terms) subsume2-records))
+;; (def subsume2-eval-records (map #(eval/add-wrong-missing % :subsume-matched-terms) subsume2-records))

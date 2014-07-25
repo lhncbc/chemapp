@@ -79,4 +79,5 @@
    
 ;; something like: (lookup "normchem" "benzene")
 (defn lookup [dbname term]
-  (mc/find dbname {:key term}))
+  (seq
+   (mc/find dbname {:key term})))
