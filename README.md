@@ -1,6 +1,6 @@
 # chemrecog
 
-FIXME: description
+Chemical Entity Recognition System
 
 ## Installation
 
@@ -55,10 +55,13 @@ java -cp /usr/local/pub/machinelearning/mallet-2.0.7/class:/usr/local/pub/machin
 
 ## Evaluation
 
-To evaluate:
+To evaluate using training-set for testing:
 
-bc-evaluate subsume-chemdner-resultlist.txt /nfsvol/nlsaux16/II_Group_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER_TRAIN_V01/cdi_ann_training_13-07-31.txt
+bc-evaluate chemdner-resultlist.txt /nfsvol/nlsaux16/II_Group_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER_TRAIN_V01/cdi_ann_training_13-07-31.txt
 
+To evaluate using development-set for testing:
+
+bc-evaluate chemdner-resultlist.txt /nfsvol/nlsaux16/II_Group_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER_DEVELOPMENT_V02/cdi_ann_development_13-08-18.txt
 
 ### Bugs
 
@@ -72,4 +75,4 @@ bc-evaluate subsume-chemdner-resultlist.txt /nfsvol/nlsaux16/II_Group_WorkArea/L
 
 Copyright © 2013 FIXME
 
-Distributed under the Eclipse Public License, the same as Clojure.
+pDistributed under the Eclipse Public License, the same as Clojure.
