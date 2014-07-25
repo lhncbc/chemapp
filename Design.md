@@ -13,7 +13,20 @@ chemTagger          metamap
 
 
 
-## 
+## Annotation List Viewer
+
+Request Form:
+   source:  pubmed or chemdner
+   docids: list of pmids or docids
+   submit
+
+Response Page
+   list of results:
+      pmid + number of annotations
+
+Document Annotation page
+
+
 
 ## Options
 
@@ -57,9 +70,115 @@ chemTagger          metamap
 ;; user> 
 
 
+## annotations and
+
+### pmid 23122105
+
+Title:
+
+"Non-target screening of Allura Red AC photodegradation products in a
+beverage through ultra high performance liquid chromatography coupled
+with hybrid triple quadrupole/linear ion trap mass spectrometry."
+
+Abstract:
+
+"The study deals with the identification of the degradation products
+formed by simulated sunlight photoirradiation in a commercial beverage
+that contains Allura Red AC dye. An UHPLC-MS/MS method, that makes use
+of hybrid triple quadrupole/linear ion trap, was developed. In the
+identification step the software tool information dependent
+acquisition (IDA) was used to automatically obtain information about
+the species present and to build a multiple reaction monitoring (MRM)
+method with the MS/MS fragmentation pattern of the species
+considered. The results indicate that the identified degradation
+products are formed from side-reactions and/or interactions among the
+dye and other ingredients present in the beverage (ascorbic acid,
+citric acid, sucrose, aromas, strawberry juice, and extract of
+chamomile flowers). The presence of aromatic amine or amide
+functionalities in the chemical structures proposed for the
+degradation products might suggest potential hazards to consumer
+health."
+
+Chemdner gold standard
+
+"Allura Red AC" "sucrose" "aromatic amine or amide" "ascorbic acid"
+"citric acid"
+
+MetaMap matched terms after filtering for semantic types:
+"carbohydrate", "inorganic chemical", "organic chemical", "chemical",
+"chemical viewed structurally", "element, ion, or isotope":
+
+"chamomile flowers" "sucrose" "amine" "ascorbic acid" "aromatic"
+"amide" "allura red ac dye" "citric acid"
+
+Normchem terms:
+"IDA" "chamomile"
+
+Partial match terms:
+"acid" "citric acid"
+
+
+
+## flow 1.
+
+1. apply metamap to documents filtering by semantic types
+   keep terms
+   keep User defined acronyms (UDAs)
+2. apply partial match
+3. apply normchem and remove any terms that are UDAs
+
+## MTI filtering 
+
+see src/chem/mti_filtering.clj
+
+
+
+## Methods
+
+### normchem
+engine: :normchem
+
+### metamap
+engine: :normchem
+
+### partial-match
+engine: :partial
+
+### partial-match with normchem
+engine: :partial-normchem
+
+
+### partial-match with metamap
+engine: :partial-enhanced
+
+### partial-match with metamap with subsuming
+engines: 
+
+### partial-match with opsin
+engines: :partial-opsin
+
+### partial-match with opsin and normchem
+engines: :partial-normchem :partial-opsin
+
+### partial-match and token-match with opsin and normchem 
+:token-opsin :partial-normchem :partial-opsin
+
+
 
 
 ...
+
+### Speed
+
+timing tests using the following commands:
+
+    (time (def subsume-result (chem.stacking/subsume-classify-record mm-api-instance record)))
+    (time (def ner-result (chem.stacking/stanford-ner-classify-record ner-classifier record)))
+    (time (def enchilad0-result (chem.stacking/enchilada0-classify-record record)))
+
+ subsume:     232285.406828 msec  87800.983504 msecs
+ enchildada0: 3516.717708 msecs 28173.301469 msecs 1977.993199 msecs 2009.773325 msecs
+ ner:         278.611298 msecs 130.748993 msecs 95.190651 msecs
 
 ### Bugs
 
