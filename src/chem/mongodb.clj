@@ -1,6 +1,7 @@
 (ns chem.mongodb
-  (:require [monger.core :as mg])
-  (:require [monger.collection :as mc])
+  (:require [monger.core :as mg]
+            [monger.collection :as mc]
+            [clojure.string :as string])
   (:import (java.io BufferedReader FileReader FileWriter))
   (:gen-class))
 
@@ -17,6 +18,18 @@
 ;;
 ;;     user> (mg/set-db! (mg/get-db "chem"))
 ;;
+;; Terse Authenticating:
+;;
+;;    (mg/authenticate (mg/get-db "chem") "chemuser" (.toCharArray "password"))
+;;
+;; Or use:
+;;
+;;    (let [conn (mg/connect)
+;;        db   (mg/get-db "chem")
+;;        u    "chemuser"
+;;        p    (.toCharArray "UserChem!@#$%")]
+;;    (mg/authenticate db u p))
+;;
 ;; To disconnect, use monger.core/disconnect!
 
 (defn setup [hostname port databasename]
@@ -29,6 +42,23 @@
   "Initialize connection to mongo db database, defaults to using chem database."
   ([] (setup "127.0.0.1" 27017 "chem"))
   ([dbname] (setup "127.0.0.1" 27017 dbname)))
+
+(defn remote-init
+  "Initialize connection to mongo db database, defaults to using chem database.
+
+   This needs some unexpected error handling code..."
+  ([] (remote-init "chem"))
+  ([dbname] 
+     (let [netrc-record
+           (first 
+            (filter #(and (> (count (nth % 1)) 10) (= (subs (nth % 1) 0 10) "mongodb://"))
+                    (map #(string/split % #" ")
+                         (string/split (slurp (str (System/getProperty "user.home") "/.netrc")) #"\n"))))
+           dbhost (subs (nth netrc-record 1) 10)
+           dbuser (nth netrc-record 3)
+           dbpass (nth netrc-record 5)]
+       (setup dbhost 27017 dbname)
+       (mg/authenticate (mg/get-db dbname) dbuser (.toCharArray dbpass)) )))
 
 (defn load-key-value-db-file [filename tablename]
   (dorun
@@ -78,6 +108,6 @@
             (partition-all 100 record-seq)))))
    
 ;; something like: (lookup "normchem" "benzene")
-(defn lookup [dbname term]
+(defn lookup [collname term]
   (seq
-   (mc/find dbname {:key term})))
+   (mc/find collname {:key term})))
