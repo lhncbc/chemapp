@@ -121,7 +121,7 @@
       (= ch \newline)))
 
 (defn is-not-chemical-punctuation [ch]
-  (contains? #{ \. \| \, \;} ch))  
+  (contains? #{ \[ \] \. \| \;} ch))  
 
 (defn chemical-delimiter [ch]
   (or (is-not-chemical-punctuation ch)
