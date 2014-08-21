@@ -1,10 +1,12 @@
-(ns chem.token-trie-utils
+(ns chem.token-trie-ner
   (:require [chem.stopwords :as stopwords])
   (:require [chem.token-trie :as token-trie]))
 
+(def ^:dynamic *max-token-scan* 15)
+
 (defn build-normchem-trie [normchem-recordmap-list]
   (token-trie/build-trie 
-   (filter #(and (> (count (first %)) 2) (not (stopwords/stopwords %)))
+   (filter #(and (> (count (first %)) 2) (nil? (stopwords/stopwords (first %))))
            (map #(list (:text %) (select-keys % [:meshid :cid :smiles]))
                 normchem-recordmap-list))))
 
@@ -12,7 +14,7 @@
   "create chem term trie, populating it with MeSH record-list and terms-not-in-mesh"
   [mesh-recordmap-list chemdner-terms-not-in-mesh]
   (token-trie/build-trie 
-   (filter #(and (> (count (first %)) 2) (not (stopwords/stopwords %)))
+   (filter #(and (> (count (first %)) 2) (nil? (stopwords/stopwords (first %))))
            (concat
             (map #(list (:text %) (select-keys % [:meshid :cid :smiles]))
                  mesh-recordmap-list)
@@ -23,7 +25,7 @@
 (defn maximal-right-scan-recursive
   "recursive version of tag-text and maximal right scan"
  [trie input-tokenlist]
-  (let [tokenlist (subvec (vec input-tokenlist) 0 (min 20 (count input-tokenlist)))]
+  (let [tokenlist (subvec (vec input-tokenlist) 0 (min *max-token-scan* (count input-tokenlist)))]
     (loop [n 1
            resultlist []]
       (let [candidate (clojure.string/lower-case 
@@ -31,8 +33,10 @@
                         (map #(:text %) (take n tokenlist))))
             candidate-resultlist
             (if (token-trie/in-trie? trie candidate)
-              (conj resultlist (list (token-trie/get-val trie candidate)
-                                     (hash-map :first-span (:span (first tokenlist)))
+              (conj resultlist (conj (hash-map :text (token-trie/get-val trie candidate)
+                                               :span (hash-map :start (-> tokenlist first :span :start)
+                                                               :end (+ (-> tokenlist first :span :start)
+                                                                       (count candidate))))
                                      (token-trie/get-meta-data trie candidate)))
               resultlist)]
         (if (empty? (drop n tokenlist))
@@ -52,7 +56,7 @@
         resultlist
         (recur (rest tokenlist) 
                (if is-beginning
-                 (concat resultlist (maximal-right-scan-v1 trie tokenlist))
+                 (concat resultlist (maximal-right-scan-recursive trie tokenlist))
                  resultlist))))))
 
 ;; iterative versions of tag-text and maximal right scan
@@ -60,16 +64,19 @@
 (defn maximal-right-scan-iterative
   "iterative version of maximal right scan"
  [trie input-tokenlist]
-  (let [tokenlist (subvec input-tokenlist 0 (min 20 (count input-tokenlist)))]
+  (let [tokenlist (subvec input-tokenlist 0 (min *max-token-scan* (count input-tokenlist)))]
     (filter #(not (nil? %))
             (map-indexed (fn [n token]
                            (let [candidate (clojure.string/lower-case
                                             (clojure.string/join
                                              (map #(:text %) (take (inc n) tokenlist))))]
                              (when (token-trie/in-trie? trie candidate)
-                               (list (token-trie/get-val trie candidate)
-                                     (hash-map :first-span (:span (first tokenlist)))
-                                     (token-trie/get-meta-data trie candidate)))))
+                               (list (conj
+                                      (hash-map :text (token-trie/get-val trie candidate)
+                                                :span (hash-map :start (-> tokenlist first :span :start)
+                                                                :end (+ (-> tokenlist first :span :start)
+                                                                        (count candidate))))
+                                      (token-trie/get-meta-data trie candidate))))))
                          tokenlist))))
 
 (defn tag-text-iterative
@@ -79,20 +86,13 @@
     (filter #(not (empty? %))
             (reduce (fn [newlist [idx token]]
                       (if (token-trie/prefix-matches trie (clojure.string/lower-case (:text token)))
-                        (conj newlist (maximal-right-scan trie (subvec tokenlist idx)))
+                        (conj newlist (maximal-right-scan-iterative trie (subvec tokenlist idx)))
                         newlist))
                     [] (map-indexed #(list %1 %2) tokenlist)))))
 
-(defn promote-cuis [annotationlist]
-  (map (fn [annotation]
-         (if (annotation :trie-match)
-           (conj annotation (hash-map :cui (-> annotation :trie-match first :CUI )))
-           annotation)) 
-       annotationlist))
-
 (defn annotate-text 
   [a-trie text]
-  (promote-cuis (tag-text-iterative a-trie text)))
+  (tag-text-recursive a-trie text))
 
 (defn annotate-record [engine-keyword trie record]
   (conj record
