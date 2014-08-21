@@ -10,7 +10,9 @@
 
 (defn add-to-trie [trie x meta-data]
   (let [tokenlist (tokenize x)]
-    (assoc-in trie tokenlist (merge (get-in trie x) {:val x :meta-data meta-data :terminal true}))))
+    (assoc-in trie tokenlist (merge (get-in trie x) {:val x
+                                                     :meta-data meta-data
+                                                     :terminal true}))))
 
 (defn in-trie? [trie x]
   "Returns true if the value x exists in the specified trie."
@@ -23,8 +25,8 @@
 (defn build-trie
   "Builds a trie over the values in the specified seq coll."
   [coll]
-  (reduce (fn [newtrie pair]
-            (add-to-trie newtrie (first pair) (second pair)))
+  (reduce (fn [newtrie [token meta-data]]
+            (add-to-trie newtrie token meta-data))
           {} coll))
                    
 (defn get-meta-data [trie x]
