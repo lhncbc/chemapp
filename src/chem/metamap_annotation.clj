@@ -1,15 +1,14 @@
 (ns chem.metamap-annotation
   (:use [clojure.set])
   (:require [clojure.string :as string])
-  (:require [chem.metamap-api :as metamap-api])
-  (:require [chem.new-metamap-api :as new-metamap-api])
+  (:require [metamap-api.metamap-api :as metamap-api])
   (:require [chem.semtypes :as semtypes])
   (:require [chem.annotations :as annotlib])
-  (:require [chem.metamap-tokenization :as tokenization])
+  (:require [skr.tokenization :as tokenization])
   (:require [chem.stopwords :as stopwords])
   (:require [chem.mti-filtering :as mti-filtering])
   (:require [chem.span-utils :as span-utils])
-  (:require [migration.mwi-utilities :as mwi-utilities]))
+  (:require [skr.mwi-utilities :as mwi-utilities]))
 
 ;; Generate annotations from MetaMap API results
 
@@ -268,3 +267,31 @@ includes punctuation, numbers, words of length 1."
   (map (fn [span]
          (span-utils/find-bounds-of-string input-text (span :start)))
   (get-spans-from-ev-elements resultlist)))
+
+
+;; Does this belong here?  If not, where does it belong?
+;;
+;; (defn subsume-tokens-in-targetset [document-text tokenlist targetset]
+;;   ^{:doc "Merge target list spans with tokenlist, remove any subsumed tokens."}
+;;   (let [targetset-spanlist (generate-spanlist-of-targetset document-text targetset)
+;;         spanlist (map #(select-keys (:span %) [:start :end])
+;;                       (concat targetset-spanlist tokenlist))
+;;         subsumed-spanlist (chem.span-utils/subsume-spans spanlist)]
+;;     (sort-by #(-> % :span :start)
+;;              (filter #(not (nil? %))
+;;                      (map (fn [span]
+;;                             (if (> (:start span) -1)
+;;                               {:span (select-keys span [:start :end])
+;;                                :text (subs document-text (:start span) (:end span))}))
+;;                           subsumed-spanlist)))))
+;;
+;; (defn analyze-text-chemicals-using-targetset [text targetset]
+;;   "Perform lexical analysis of input text."
+;;   (expand-tokens
+;;    (subsume-tokens-in-targetset text (-> text
+;;                                          tokenize
+;;                                          make-map-tokenlist
+;;                                          classify-tokens
+;;                                          add-spans)
+;;                                 targetset)))
+

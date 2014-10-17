@@ -1,8 +1,8 @@
 (ns chem.mti-filtering
   (:use [clojure.set :only [intersection]])
   (:require [chem.utils])
-  (:require [chem.rrf-mongodb :as rrfdb])
-  (:require [somnium.congomongo :as m]))
+  ;; (:require [somnium.congomongo :as m])
+)
 
 ;; keep concepts with these semantic types
 (def valid-semtypes 
@@ -166,7 +166,8 @@
   #{ :element :small-biochemical :peptide :nucleotide :polymer :mineral })
 
 (defn semantic-types-records-for-cui [cui]
-  (m/fetch :mrsty :where {:cui cui}))
+  ;; (m/fetch :mrsty :where {:cui cui})
+)
 
 (defn tuilist-for-cui [cui]
   (map #(:tui %)
@@ -180,14 +181,17 @@
   (stylist-for-cui (:cui record)))
 
 (defn list-valid-semtypes-for-record [record]
-  (let [cui (:cui record)]
-    (filter #(contains? valid-semtypes (:tui %))
-            (m/fetch :mrsty :where {:cui cui}))))
+;;  (let [cui (:cui record)]
+  ;;  (filter #(contains? valid-semtypes (:tui %))
+            ;; (m/fetch :mrsty :where {:cui cui})))
+)
 
 (defn list-exclude-semtypes-for-record [record]
-  (let [cui (:cui record)]
-    (filter #(contains? exclude-semtypes (:tui %))
-            (m/fetch :mrsty :where {:cui cui}))))
+  ;; (let [cui (:cui record)]
+    ;; (filter #(contains? exclude-semtypes (:tui %))
+       ;;     (m/fetch :mrsty :where {:cui cui})))
+
+)
 
 (defn is-valid-chemical-by-semtype [record]
   (< 0 (count (list-valid-semtypes-for-record record))))
