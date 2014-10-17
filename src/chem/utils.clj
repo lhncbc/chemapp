@@ -173,7 +173,14 @@
 (defn list-matching-ns [parent]
   (filter #(re-matches (re-pattern (format "%s.*" parent)) (str %)) (all-ns)))
 
-(defn write-json-to-file [outfilename obj]
+(defn write-edn-to-file
+  "write object to file in edn format."
+  [outfilename obj]
+  (spit outfilename (pr-str obj)))
+
+(defn write-json-to-file
+  "write object to file in json format."
+  [outfilename obj]
   (spit outfilename (json/write-str obj)))
   
 
