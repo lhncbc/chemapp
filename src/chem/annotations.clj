@@ -2,11 +2,12 @@
   (:use [clojure.set])
   (:require [clojure.string :as string]))
 
-(defn annotate-text
+(defn annotate-text-using-spans
   "Given document and spans annotate document for display.
    variable 'spans' is of the form:
 
-        [{:start begin0, :end end0} {:start begin1, :end end1} ...]"
+      [{:start begin0, :end end0}
+       {:start begin1, :end end1} ...]"
   [text spans begintag endtag eoltag]
   (let [startset (set (map #(:start %) spans))
         endset (set (map #(:end %) spans))]
@@ -16,13 +17,43 @@
       (if (< i (count text))
         (let [ch (.charAt text i)
               rch (cond 
-                 (contains? startset i) (str begintag ch)
-                 (contains? endset i) (str endtag ch)
-                 (= ch \newline) (str ch eoltag)
-                 :else ch)]
+                   (contains? startset i) (str begintag ch)
+                   (contains? endset i) (str endtag ch)
+                   (= ch \newline) (str ch eoltag)
+                   :else ch)]
           (recur (inc i) text (conj result rch)))
         (string/join result)))))
 
+(defn annotate-text-using-annotations
+  "Given document and spans annotate document for display.
+   variable 'annotations' is of the form:
+
+      [{:span {:start begin0, :end end0} :trigger-key foo}
+       {:span {:start begin1, :end end1}} ...]"
+  [text annotations trigger-key begintag0 endtag0 begintag1 endtag1 eoltag]
+  (let [spans (map #(:span %) annotations)
+        startset (set (map #(:start %) spans))
+        endset (set (map #(:end %) spans))
+        triggerset (reduce (fn [newset annot]
+                             (if (contains? annot trigger-key)
+                               (conj newset (:start (:span annot)))
+                               newset)) #{} annotations)]
+    (loop [i 0 
+           text text
+           result (vec "")] 
+      (if (< i (count text))
+        (let [ch (.charAt text i)
+              rch (cond 
+                   (contains? startset i) (if (contains? triggerset i)
+                                            (str begintag0 ch)
+                                            (str begintag1 ch))
+                   (contains? endset i) (if (contains? triggerset i) 
+                                          (str endtag0 ch)
+                                          (str endtag1 ch))
+                   (= ch \newline) (str ch eoltag)
+                   :else ch)]
+          (recur (inc i) text (conj result rch)))
+        (string/join result)))))
 
 (defn get-spans-from-annotations [annotationlist]
   (sort-by #(:start %)
@@ -95,15 +126,17 @@
                               (hash-map :annotations
                                         (resultmap :abstract-result)))))))
 
-(defn gen-record-map-by-docid [recordlist]
+(defn gen-record-map-by-docid
   ^{:doc "Generate a map of records keyed by docid from recordlist."}
+ [recordlist]
   (into {} 
         (map #(vec (list (:docid %) %))
              recordlist)))
 
 
-(defn annotate-record [engine-keyword func record]
+(defn annotate-record
   "Annotate record using supplied function, tag annotations with user supplied engine keyword."
+  [engine-keyword func record]
   (conj record
         (hash-map engine-keyword
                   (hash-map :title-result 

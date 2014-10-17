@@ -4,7 +4,6 @@
   (:use [chem.chemdner-tools])
   (:require [clojure.data.json :as json])
   (:require [clojure.string :as string])
-  (:require [somnium.congomongo :as m])
   (:require [chem.process :as process])
   (:require [chem.metamap-annotation :as mm-annot])
   (:gen-class))
@@ -70,16 +69,17 @@
   "format: docid \t chemical \t rank \t confidence-score
 
    example:
-     6780324  LHRH        1   0.9
-     6780324  FSH         2   0.857142857143
-     6780324  3H2O        3   0.75
-     6780324  (Bu)2cAMP   4   0.75"
+
+       6780324  LHRH        1   0.9
+       6780324  FSH         2   0.857142857143
+       6780324  3H2O        3   0.75
+       6780324  (Bu)2cAMP   4   0.75"
   (.write w (format "%d\t%s\t%d\t%f\n" 
                     docid term rank score)))
 
 ;; 
-;; user> (def result-list (chem.pipeline/process chemdner-dev-abstracts))
-;; #'user/result-list
+;;    user> (def result-list (chem.pipeline/process chemdner-dev-abstracts))
+;;    #'user/result-list
 ;; 
 (defn write-json-annotation [w annotation]
   (.write w (format "%s\n" (json/write-str annotation))))
@@ -95,26 +95,26 @@
        (chem.utils/line-seq-from-file infilename)))
 
 
-;; (def training-filename (str chem.paths/training-dir "/chemdner_abs_training.txt"))
-;; (def training-records (chem.chemdner-tools/load-chemdner-abstracts training-filename))
+;;    (def training-filename (str chem.paths/training-dir "/chemdner_abs_training.txt"))
+;;    (def training-records (chem.chemdner-tools/load-chemdner-abstracts training-filename))
 ;;
 ;;
-;; (def partial-abs-annotation-list (chem.pipeline/annotate-document-set "partial" training-records))
-;; (write-annotations-to-file "partial-abs-annotations.json" partial-abs-annotation-list)
-;; (def partial-chemdner-result-list (chem.pipeline/gen-chemdner-result-list partial-abs-annotation-list))
-;; (chem.utils/write-elements "partial-chemdner-result-list.txt"
-;;    (map chem.pipeline/format-chemdner-result-element partial chemdner-result-list))
+;;    (def partial-abs-annotation-list (chem.pipeline/annotate-document-set "partial" training-records))
+;;    (write-annotations-to-file "partial-abs-annotations.json" partial-abs-annotation-list)
+;;    (def partial-chemdner-result-list (chem.pipeline/gen-chemdner-result-list partial-abs-annotation-list))
+;;    (chem.utils/write-elements "partial-chemdner-result-list.txt"
+;;       (map chem.pipeline/format-chemdner-result-element partial chemdner-result-list))
 
-;; (def normchem-abs-annotation-list (chem.pipeline/annotate-document-set "normchem" training-records))
-;; (write-annotations-to-file "normchem-abs-annotations.json" normchem-abs-annotation-list)
-;; (def normchem-chemdner-result-list (chem.pipeline/gen-chemdner-result-list normchem-abs-annotation-list))
-;; (chem.utils/write-elements "normchem-chemdner-result-list.txt"
-;;   (map chem.pipeline/format-chemdner-result-element normchem-chemdner-result-list))
+;;    (def normchem-abs-annotation-list (chem.pipeline/annotate-document-set "normchem" training-records))
+;;    (write-annotations-to-file "normchem-abs-annotations.json" normchem-abs-annotation-list)
+;;    (def normchem-chemdner-result-list (chem.pipeline/gen-chemdner-result-list normchem-abs-annotation-list))
+;;    (chem.utils/write-elements "normchem-chemdner-result-list.txt"
+;;      (map chem.pipeline/format-chemdner-result-element normchem-chemdner-result-list))
 
-;; (def metamap-abs-annotation-list (chem.pipeline/annotate-document-set  "metamap" training-records))
-;; (write-annotations-to-file "metamap-abs-annotations.json" metamap-abs-annotation-list)
-;; (def metamap-chemdner-result-list (chem.pipeline/gen-chemdner-result-list "metamap" metamap-abs-annotation-list))
-;; (chem.utils/write-elements "metamap-chemdner-result-list.txt"
-;;   (map chem.pipeline/format-chemdner-result-element metamap-chemdner-result-list))
+;;    (def metamap-abs-annotation-list (chem.pipeline/annotate-document-set  "metamap" training-records))
+;;    (write-annotations-to-file "metamap-abs-annotations.json" metamap-abs-annotation-list)
+;;    (def metamap-chemdner-result-list (chem.pipeline/gen-chemdner-result-list "metamap" metamap-abs-annotation-list))
+;;    (chem.utils/write-elements "metamap-chemdner-result-list.txt"
+;;      (map chem.pipeline/format-chemdner-result-element metamap-chemdner-result-list))
 
-;; (def abs-annotation-list (chem.pipeline/read-annotations-from-file "abs-annotations.json"))
+;;    (def abs-annotation-list (chem.pipeline/read-annotations-from-file "abs-annotations.json"))

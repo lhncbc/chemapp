@@ -3,14 +3,15 @@
   (:require [monger.core :as mg])
   (:require [monger.collection :as mc])
   (:require [chem.annotations :as annot])
-  (:require [chem.metamap-tokenization :as mm-tokenization])
+  (:require [skr.tokenization :as mm-tokenization])
   (:require [chem.span-utils :as span-utils])
   (:require [chem.stopwords :as stopwords])
-  (:require [migration.mwi-utilities :as mwi-utilities]))
+  (:require [skr.mwi-utilities :as mwi-utilities]))
 
-(defn setup [hostname port databasename]
+(defn setup
   "Initialize connection to mongo db database on specified hostname
-   and port, defaults to using chem database."
+  and port, defaults to using chem database."
+  [hostname port databasename]
   (mg/connect! { :host hostname :port port })
   (mg/set-db! (mg/get-db databasename)))
 
@@ -35,17 +36,20 @@
                  lines-partition))))
         (partition-all 100 (line-seq (BufferedReader. (FileReader. filename)))))))
 
-(defn lookup [dbname term]
+(defn lookup
   "Something like: (lookup \"normchem\" \"benzene\")"
-  (mc/find-one dbname {:cstring term}))
+  [collection term]
+  (mc/find-one-as-map collection {:cstring term}))
 
-(defn nmslookup [dbname term]
+(defn nmslookup
   "Something like: (lookup \"normchem\" (normalize-meta-string \"benzene\"))"
-  (mc/find-one dbname {:ncstring (mwi-utilities/normalize-meta-string term)}))
+  [collection term]
+  (mc/find-one-as-map collection {:ncstring (mwi-utilities/normalize-meta-string term)}))
 
-(defn tokenize-document [document]
+(defn tokenize-document 
   "Convert text to tokens containing starting position, ending
-   position, and text content."
+  position, and text content."
+  [document]
   (let [tokenlist (mm-tokenization/tokenize document 0)]
     (loop [i 0 j 0
            annotlist '()]
@@ -53,50 +57,55 @@
         (recur (+ i (count (nth tokenlist j)))
                (inc j)
                (conj annotlist (hash-map 
-                                   :start i
-                                   :end (+ i (count (nth tokenlist j)))
-                                   :text (nth tokenlist j))))
+                                :start i
+                                :end (+ i (count (nth tokenlist j)))
+                                :text (nth tokenlist j))))
         annotlist))))
 
 (defn suppconcept-lookup [document]
-    "Lookup supplementary concept, restricting to chemicals."
-   (filter #(not (nil? %))
-           (map (fn [token]
-                  (when (and (> (count (:text token)) 2) (not (contains? stopwords/stopwords (clojure.string/lower-case (:text token)))))
-                    (let [result (nmslookup "nmsnormchem" (clojure.string/lower-case (:text token)))]
-                      (when result
-                        (hash-map
-                         :span {:start (token :start)
-                                :end   (token :end)}
-                         :text  (token :text)
-                         :dui   (get result "meshid"))))))
-                (tokenize-document document))))
-
-(defn suppconcept-lookup-finding-boundary [document]
-  "Lookup supplementary concept, restricting to chemicals,
-   set span to leading and following extent of term."
+  "Lookup supplementary concept, restricting to chemicals."
   (filter #(not (nil? %))
           (map (fn [token]
                  (when (and (> (count (:text token)) 2) (not (contains? stopwords/stopwords (clojure.string/lower-case (:text token)))))
-                   (let [result (into {}  (nmslookup "nmsnormchem" (clojure.string/lower-case (:text token))))]
-                     (when result 
-                       (let [bounds (span-utils/check-span
-                                     (span-utils/find-bounds-of-string document (token :start))
-                                     document)]
-                         (when (not (nil? bounds))
-                           (hash-map
-                            :span {:start (bounds :start)
-                                   :end   (bounds :end)}
-                            :text      (.substring document (bounds :start) (bounds :end))
-                            :dui       (get result "meshid")
-                            :pubchemid (get result "pubchemid"))))))))
+                   (let [result (nmslookup "nmsnormchem" (clojure.string/lower-case (:text token)))]
+                     (when result
+                       (hash-map
+                        :span {:start (token :start)
+                               :end   (token :end)}
+                        :text  (token :text)
+                        :dui   (get result :meshid))))))
                (tokenize-document document))))
+
+(defn suppconcept-lookup-finding-boundary
+  "Lookup supplementary concept, restricting to chemicals,
+   set span to leading and following extent of term."
+  [document]
+  (filter #(not (nil? (:dui %)))
+          (filter #(not (nil? %))
+                  (map (fn [token]
+                         (let [text (:text token)
+                               lc-text (clojure.string/lower-case text)]
+                           (when (and (> (count text) 2) 
+                                      (not (contains? stopwords/stopwords lc-text)))
+                             (let [result (into {}  (nmslookup "nmsnormchem" lc-text))]
+                               (when result 
+                                 (let [bounds (span-utils/check-span
+                                               (span-utils/find-bounds-of-string document (token :start))
+                                               document)]
+                                   (when (not (nil? bounds))
+                                     (hash-map
+                                      :span {:start (bounds :start)
+                                             :end   (bounds :end)}
+                                      :text      (.substring document (bounds :start) (bounds :end))
+                                      :dui       (get result :meshid)
+                                      :pubchemid (get result :pubchemid)))))))))
+                       (tokenize-document document)))))
 
 (defn get-spans [annotation-list]
   (map #(hash-map :start (-> % :span :start)
                   :end   (-> % :span :end))
        annotation-list))
-           
+
 (defn gen-scored-list-from-result [result]
   "return list of [doc annotation score"
   (let [docid (result :docid)]
@@ -132,49 +141,50 @@
 
 (defn process-document [document]
   (let [annotation-list (suppconcept-lookup-finding-boundary document)]
-    (hash-map :annotations annotation-list)))
+    (hash-map :spans (sort-by :start (map #(:span %) annotation-list))
+              :annotations annotation-list)))
 
 (defn filter-partial-match-using-normchem [record]
- ^{:doc "Keep partial-match annotations that are represented in
+  ^{:doc "Keep partial-match annotations that are represented in
          normalized supplementary chemical database." }
- (conj record 
-       (hash-map :partial-normchem
-                 (hash-map :title-result
-                           (hash-map :annotations
-                                     (filter
-                                      #(not (nil? (% :cstring)))
-                                      (map
-                                       (fn [annotation] 
-                                         (let [result 
-                                               (into
-                                                {} 
-                                                (nmslookup "nmsnormchem" (:text annotation)))]
-                                           (if result 
-                                             (merge annotation {:meshid (result "meshid")
-                                                                :pubchemid (result "pubchemid")
-                                                                :cstring (result "cstring")
-                                                                :ncstring (result "ncstring")})
-                                             nil)))
-                                       (annot/list-annotations :partial :title-result record))))
-                           :abstract-result
-                           (hash-map :annotations
-                                     (filter
-                                      #(not (nil? (% :cstring)))
-                                      (map
-                                       (fn [annotation] 
-                                         (let [result 
-                                               (into
-                                                {} 
-                                                (nmslookup "nmsnormchem" (:text annotation)))]
-                                           (if result 
-                                             (merge annotation {:meshid (result "meshid")
-                                                                :pubchemid (result "pubchemid")
-                                                                :cstring (result "cstring")
-                                                                :ncstring (result "ncstring")})
-                                             nil)))
-                                       (annot/list-annotations :partial :abstract-result record))))))))
+  (conj record 
+        (hash-map :partial-normchem
+                  (hash-map :title-result
+                            (hash-map :annotations
+                                      (filter
+                                       #(not (nil? (% :cstring)))
+                                       (map
+                                        (fn [annotation] 
+                                          (let [result 
+                                                (into
+                                                 {} 
+                                                 (nmslookup "nmsnormchem" (:text annotation)))]
+                                            (if result 
+                                              (merge annotation {:meshid (result "meshid")
+                                                                 :pubchemid (result "pubchemid")
+                                                                 :cstring (result "cstring")
+                                                                 :ncstring (result "ncstring")})
+                                              nil)))
+                                        (annot/list-annotations :partial :title-result record))))
+                            :abstract-result
+                            (hash-map :annotations
+                                      (filter
+                                       #(not (nil? (% :cstring)))
+                                       (map
+                                        (fn [annotation] 
+                                          (let [result 
+                                                (into
+                                                 {} 
+                                                 (nmslookup "nmsnormchem" (:text annotation)))]
+                                            (if result 
+                                              (merge annotation {:meshid (result "meshid")
+                                                                 :pubchemid (result "pubchemid")
+                                                                 :cstring (result "cstring")
+                                                                 :ncstring (result "ncstring")})
+                                              nil)))
+                                        (annot/list-annotations :partial :abstract-result record))))))))
 
 (defn make-pairs [normchem-record]
-  (map #(list '(:text %) '(:probability 1.0))
-       (filter #(not (nil? (:dui %)))
-               (:annotations (:abstract-result (:normchem normchem-record))))))
+  (pmap #(list '(:text %) '(:probability 1.0))
+        (filter #(not (nil? (:dui %)))
+                (:annotations (:abstract-result (:normchem normchem-record))))))

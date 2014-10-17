@@ -17,7 +17,7 @@
    (map 
     (fn [line]
       (let [fields (vec (.split line "\t"))]
-        (hash-map :docid    (java.lang.Integer/parseInt (nth fields 0))
+        (hash-map :docid    (java.lang.Integer/parseInt (nth fields 0)) ; use read-string instead?
                   :title    (nth fields 1)
                   :abstract (nth fields 2))))
     (line-seq (BufferedReader. (FileReader. filename))))))
@@ -39,7 +39,7 @@
        (require '[somnium.congomongo :as m])
        (m/add-index! :tablename [:recid])"
   [fields]
-  (hash-map :docid    (java.lang.Integer/parseInt (nth fields 0))
+  (hash-map :docid    (java.lang.Integer/parseInt (nth fields 0)) ; use read-string instead?
             :title    (nth fields 1)
             :abstract (nth fields 2)))
 
@@ -70,8 +70,8 @@
      (let [fields (vec (.split line "\t"))]
        {:docid (java.lang.Integer/parseInt (nth fields 0))
         :location  (nth fields 1)
-        :start (nth fields 2)
-        :end   (nth fields 3)
+        :start (java.lang.Integer/parseInt (nth fields 2))
+        :end   (java.lang.Integer/parseInt (nth fields 3))
         :text  (nth fields 4)
         :chemtype  (nth fields 5)}))
    (line-seq (BufferedReader. (FileReader. filename)))))
@@ -139,14 +139,42 @@
         :offset-triplet offset-triplet}))
    (line-seq (BufferedReader. (FileReader. filename)))))
 
-
-
 (defn gen-training-records-map
   "Generate map of training records by docid."
   [training-records]
   (reduce (fn [newmap el]
             (assoc newmap (:docid el) el))
           {} training-records))
+
+(defn gen-training-annotations-map
+  "build map of mti or training annotations by docid"
+  [annotation-list]
+  (reduce (fn [newmap el]
+            (let [docid (:docid el)
+                  term  (:term el)]
+              (if (contains? newmap docid)
+                (assoc newmap docid (conj (newmap docid) term))
+                (assoc newmap docid (set (list term))))))
+          {} annotation-list))
+
+(defn gen-chemdner-training-gold-map [chemdner-training-cdi-gold-list]
+  (gen-training-annotations-map chemdner-training-cdi-gold-list))
+
+(defn gen-record-map [records] 
+  (into {} (map #(vec (list (:docid %) %)) records)))
+
+(defn add-chemdner-gold-annotations
+  ^{:doc "Add chemdner gold standard annotation for document using document's docid."}
+  [gold-doc-term-map document]
+  (conj document 
+        (hash-map :chemdner-gold-standard (gold-doc-term-map (document :docid)))))
+
+(defn add-gold-standard-to-records [training-records chemdner-training-cdi-gold-map]
+  (map #(add-chemdner-gold-annotations chemdner-training-cdi-gold-map %)
+       training-records))
+
+(defn gen-termset-from-chemdner-gold-standard [records]
+  (set (apply concat (map #(:chemdner-gold-standard %) records))))
 
 ;; ## Additional comments
 
@@ -231,4 +259,85 @@
 ;;     (def training-annotations (chem.chemdner-tools/load-chemdner-annotations training-annot-filename))
 ;;     (def development-filename (str chem.paths/training-dir "/chemdner_abs_development.txt"))
 ;;     (def development-records (chem.chemdner-tools/load-chemdner-abstracts development-filename))
-<
+
+
+(defn gen-term-attribute-map 
+  "Populate chemical attribute map with chemical type attributes
+  obtained from training-set annotations."
+  [chemdner-annotation-list]
+  (reduce (fn [newmap record]
+            (let [{start :start
+                   end :end
+                   text :text
+                   type :chemtype} record]
+              (if (contains? newmap text)
+                (assoc newmap text (assoc (newmap text) text {:start start
+                                                              :end end
+                                                              :type type}))
+                (assoc newmap text {:start start 
+                                    :end end
+                                    :type type}))))
+          {} chemdner-annotation-list))
+
+(defn gen-docid-term-attribute-map 
+  "Generate a map of docid -> term -> attributes from chemdner-annotation-list."
+  [chemdner-annotation-list]
+  (reduce (fn [newmap record]
+            (let [{docid :docid
+                   location :location
+                   start :start
+                   end :end
+                   text :text
+                   type :chemtype} record]
+              (if (contains? newmap docid)
+                (assoc newmap docid 
+                       (conj (newmap docid)
+                               (assoc (newmap docid) text 
+                                      (if (contains? (newmap docid) text)
+                                        (conj ((newmap docid) text)
+                                              {:location location 
+                                               :start start
+                                               :end end
+                                               :type type})
+                                        (list {:location location
+                                               :start start
+                                               :end end
+                                               :type type})))))
+                (assoc newmap docid {text (list {:location location
+                                           :start start 
+                                           :end end
+                                           :chemtype type})}))))
+          {} chemdner-annotation-list))
+
+(defn gen-docid-span-start-attribute-map
+  "Generate a map of docid -> span-start -> attributes from chemdner-annotation-list."
+  [chemdner-annotation-list]
+  (reduce (fn [newmap record]
+            (let [{docid :docid
+                   location :location
+                   start :start
+                   end :end
+                   text :text
+                   type :chemtype} record]
+              (if (contains? newmap docid)
+                (assoc newmap docid 
+                       (conj (newmap docid)
+                               (assoc (newmap docid) start
+                                      (if (contains? (newmap docid) start)
+                                        (conj ((newmap docid) start)
+                                              {:location location 
+                                               :start start
+                                               :end end
+                                               :text text
+                                               :type type})
+                                        (list {:location location
+                                               :start start
+                                               :end end
+                                               :text text
+                                               :type type})))))
+                (assoc newmap docid {start (list {:location location
+                                                  :start start 
+                                                  :end end
+                                                  :text text
+                                                  :chemtype type})}))))
+          {} chemdner-annotation-list))

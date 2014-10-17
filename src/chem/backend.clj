@@ -17,9 +17,9 @@
           (mc/find "training.abstracts" :limit len))))
 
 (defn list-documents
-  ([len] (list-documents "chem" len))
+  ([len] (list-documents "training.abstracts" len))
   ([dbname len]
-     (mc/find :training.abstracts :limit len)))
+     (mc/find dbname :limit len)))
 
 (defn get-document [docid]
   (first (mc/find-one "training.abstracts" {:docid docid})))

@@ -1,9 +1,9 @@
 (ns chem.partial-enhanced
   (:use     [clojure.set])
   (:require [chem.partial :as partial])
-  (:require [chem.metamap-api :as metamap-api])
+  (:require [metamap-api.metamap-api :as metamap-api])
   (:require [chem.metamap-annotation :as mm-annotation])
-  (:require [chem.metamap-tokenization :as mm-tokenization])
+  (:require [skr.tokenization :as mm-tokenization])
   (:require [chem.mti-filtering :as mti-filtering]))
 
 (defn match [mmapi document]

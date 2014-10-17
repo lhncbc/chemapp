@@ -1,6 +1,7 @@
 (ns chem.rules
-  (:require [instaparse.core :as insta])
-  (:require [chem.mongodb :as mongodb])
+  (:require [instaparse.core :as insta]
+            [chem.mongodb :as mongodb])
+  
   (:gen-class))
 
 ;;
@@ -63,10 +64,9 @@
   (contains? #{:rule1 :rule2 :rule3 :rule4 :rule5 :rule7} word-type))
 
 (defn chemical? [word]
-  (> (count (mongodb/lookup :normchem word)) 0))
+  (> (count (mongodb/lookup "normchem" word)) 0))
 
-
-(def badending-set #{"ing", "mic", "tion", "ed", "sis", "ism", "coccus" "ment"})
+(def badending-set #{"ing", "mic", "tion", "ed", "sis", "ism", "coccus" "ment" "ies" "oli" "lyte"})
 
 (defn has-badending-v1? [word]
   (and (not (or (= "glutamic" word) (= "polychlorinated" word)))

@@ -97,7 +97,6 @@
     (dorun (map #(.write w (str (string/join "\t" %) "\n"))
                 chemdner-resultlist))))
 
-
 ;; convert to chemdner format
 (defn gen-flow1-chemdner-resultlist [flow1-records]
   (doall
@@ -108,15 +107,15 @@
                   (:flow1-matched-terms record)))
                flow1-records))))
 
-
 (defn gen-metamap-chemdner-resultlist [metamap-records]
   (doall
    (apply concat
           (map (fn [record]
                  (docid-termlist-to-chemdner-result 
                   (:docid record)
-                  (set (concat (annot/get-matched-terms-from-annotations (:annotations (:title-result (:metamap record))))
-                               (annot/get-matched-terms-from-annotations (:annotations (:abstract-result (:metamap record))))))))
+                  (set (concat
+                        (annot/get-matched-terms-from-annotations (-> record :metamap :title-result :annotations))
+                        (annot/get-matched-terms-from-annotations (-> record :metamap :abstract-result :annotations))))))
                metamap-records))))
 
 (defn gen-partial-chemdner-resultlist [partial-match-records]
@@ -141,9 +140,6 @@
                                (annot/get-matched-terms-from-annotations (:annotations (:abstract-result (:metamap record))))))))
                metamap-partial-records))))
 
-(defn gen-metamap-partial-subsume-records [metamap-partial-records]
-  (chem.process/map-flow metamap-partial-records chem.process/subsume-flow))
-
 (defn gen-metamap-partial-subsume-chemdner-resultlist [metamap-partial-subsume-records]
   (doall
    (apply concat
@@ -152,4 +148,12 @@
                   (:docid record)
                   (set (:subsume-matched-terms record))))
                metamap-partial-subsume-records))))
+
+(defn gen-chemdner-resultlist
+  [annotated-record-list engine-keyword]
+  (apply concat
+         (map #(docid-termlist-to-chemdner-result
+                (:docid %)
+                (get-annotation-termlist % engine-keyword))
+              annotated-record-list)))
 

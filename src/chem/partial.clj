@@ -1,10 +1,11 @@
 (ns chem.partial
-  (:require [clojure.set])
-  (:require [chem.dictionaries :as dictionaries])
-  (:require [chem.span-utils :as span-utils])
-  (:require [chem.rules :as rules])
+  (:require [clojure.set]
+            [chem.dictionaries :as dictionaries]
+            [chem.span-utils :as span-utils]
+            [chem.rules :as rules]
+            [chem.stopwords :as stopwords]
+            [chem.annotations :as annot])
   (:use [chem.utils])
-  (:use [chem.annotations])
   (:gen-class))
 
 ;; Using IUPAC prefix, infix, and suffix dictionaries find chemical names in input text
@@ -14,8 +15,14 @@
    #(not (rules/has-badending? (:text %)))
    annotation-list))
 
+(defn remove-stopwords
+  "remove stopwords from spanlist"
+ [text spanlist]
+ (filter #(not (stopwords/stopwords (clojure.string/lower-case (.substring text (% :start) (% :end)))))
+          spanlist))
+
 (defn make-annotations [fragment text spanlist]
-  (map (fn [span]
+  (pmap (fn [span]
          (hash-map
           :fragment fragment
           :text (.substring text (span :start) (span :end))
@@ -72,17 +79,20 @@
             spanlist)))
 
 (defn get-annotations-using-dictionary
-  "Generate annotations using supplied dictionary."
+  "Generate annotations using supplied fragment dictionary."
   ([dictionary text]
      (get-annotations-using-dictionary 
       dictionary span-utils/find-term-spanlist-with-target text))
   ([dictionary spanlist-fn text]
      (sort-by #(:start (:span %))
               (reduce (fn [newset span]
-                        (clojure.set/union newset (set (make-annotations
-                                                        (subs text (span :start) (span :end)) 
-                                                        text
-                                                        (list (span-utils/find-bounds-of-string text (span :start)))))))
+                        (clojure.set/union newset
+                                           (set (make-annotations
+                                                 (subs text (span :start) (span :end)) 
+                                                 text
+                                                 (remove-stopwords
+                                                  text
+                                                  (list (span-utils/find-bounds-of-string text (span :start))))))))
                       #{} (get-fragment-annotations-using-dictionary dictionary text)))))
 
 (defn get-annotations-using-dictionary-v1
@@ -103,9 +113,13 @@
 (defn match
   "Partial match using fragments with bounds expansion"
   ([document dictionary]
-     (let [annotations (consolidate-annotations
+     (let [annotations 
+           (filter #(and (> (count (:text %)) 1)
+                         (not= (:output %) "O")
+                         (not (chem.rules/has-badending? (:text %))))
+                   (consolidate-annotations
                         (get-annotations-using-dictionary
-                         dictionary document))]
+                         dictionary document)))]
        { :annotations annotations }))
   ([document]
      (match document dictionaries/fragment-dictionary)))
@@ -118,7 +132,7 @@
                       span-utils/find-prefix-spanlist-with-target
                       document)
                      :prefix)]
-    { :annotations annotations }))
+    {:annotations annotations }))
 
 (defn suffix-match [document]
   "Partial match using fragments with bounds expansion"
@@ -130,7 +144,7 @@
                       span-utils/find-suffix-spanlist-with-target
                       document)
                      :suffix)]
-    { :annotations annotations }))
+    {:annotations annotations }))
 
 (defn prefix-or-suffix-match [document]
   "Partial match using fragments with bounds expansion"
@@ -138,19 +152,23 @@
                            dictionaries/fragment-suffix-dictionary 
                            dictionaries/suffix-dictionary)
         annotations 
-        (sort-by #(:start (:span %))
-                 (concat         
-                  (get-annotations-using-dictionary
-                   dictionaries/prefix-dictionary
-                   span-utils/find-prefix-spanlist-with-target
-                   document)
-                  (get-annotations-using-dictionary
-                   suffix-dictionary
-                   span-utils/find-suffix-spanlist-with-target
-                   document)
-                  ))
+        (filter #(and (> (count (:text %)) 1)
+                      (not= (:output %) "O")
+                      (not (chem.rules/has-badending? (:text %))))
+                (consolidate-annotations
+                 (sort-by #(:start (:span %))
+                          (concat         
+                           (get-annotations-using-dictionary
+                            dictionaries/prefix-dictionary
+                            span-utils/find-prefix-spanlist-with-target
+                            document)
+                           (get-annotations-using-dictionary
+                            suffix-dictionary
+                            span-utils/find-suffix-spanlist-with-target
+                            document)
+                           ))))
         ]
-    { :annotations annotations}))
+    {:annotations annotations}))
 
 (defn fragment-match
   ([document dictionary]
@@ -160,14 +178,40 @@
   ([document]
      (fragment-match document dictionaries/fragment-dictionary)))
 
-(defn record-to-sldiwi [record engine-keyword]
+(defn record-to-sldiwi
   "Convert annotations for engine specified by keyword to single line demlimited input with docid (sldiwi)."
+  [record engine-keyword]
   (set 
    (concat 
-    (map (fn [annotation]
+    (pmap (fn [annotation]
            (list (:docid record) (utf8-to-ascii (:text annotation))))
          (-> record engine-keyword :title-result :annotations))
-    (map (fn [annotation]
+    (pmap (fn [annotation]
            (list (:docid record) (utf8-to-ascii (:text annotation))))
          (-> record engine-keyword :abstract-result :annotations)))))
 
+(defn make-pairs
+  "Make annotations from enchilada0 NER into pairs usable by meta-classifier."
+  [annotated-record] 
+  (vec
+   (set
+    (map #(vec (list (:text %) 1.0))
+         (concat
+          (-> annotated-record :partial :title-result    :annotations)
+          (-> annotated-record :partial :abstract-result :annotations))))))
+
+
+(defn partial-annotate-record [record]
+  (annot/annotate-record :partial match record))
+
+(defn partial-classify-record
+  "Use partial match matchers recognize chemicals."
+  [record]
+  (make-pairs (partial-annotate-record record)))
+
+(defn process-document
+  [document]
+  (let [result (match document)]
+    (assoc result :spans (map #(:span %)
+                              (:annotations result)))))
+        

@@ -23,18 +23,68 @@
     "undeca"
     ;; "di"
     ;; "mono"
+    "1,1"
+    "1,2"
+    "1,3"
+    "1,4"
+    "1,5"
+    "1,6"
+    "1,7"
+    "1,8"
+    
+    "7,8"
     })
 
 ;; element names
 (def elements
   #{
-   "carbon"
-   "deuterium"
-   "helium"
-   "hydrogen"
-   "iron"
-   "nitrogen"
-   "oxygen"
+    "aluminium"
+    "argon"
+    "arsenic"
+    "astatine"
+    "beryllium"
+    "bismuth"
+    "boron"
+    "bromine"
+    "cadmium"
+    "calcium"
+    "carbon"
+    "chlorine"
+    "chromium"
+    "cobalt"
+    "copper"
+    "deuterium"
+    "flourine"
+    "gallium"
+    "germanium"
+    "helium"
+    "hydrogen"
+    "indium"
+    "iodine"
+    "iridium"
+    "iron"
+    "krypton"
+    "lithium"
+    "magnesium"
+    "manganese"
+    "mercury"
+    "neon"
+    "nickel"
+    "nitrogen"
+    "oxygen"
+    "phosphorus"
+    "platinum"
+    "potassium"
+    "radon"
+    "scandium"
+    "selenium"
+    "silver"
+    "sodium"
+    "sulfur"
+    "tim"
+    "titanium"
+    "vanadium"
+    "zinc"
    })
 
 ;; trival names
@@ -49,6 +99,25 @@
     "ribose"
     "thiophene"
     "threose"
+    "urea"
+
+    "benzo"                             ;does this really belong here?
+    "chloro"                            ;does this really belong here?
+
+    "isochromanyl"
+    "chromanyl"
+    "pyrrolidinyl"
+    "pyrrolinyl"
+    "imidazolidinyl"
+    "imidazolinyl"
+    "pyrazolidinyl"
+    "pyrazolinyl"
+    "piperidyl"
+    "piperazinyl"
+    "indolinyl"
+    "isoindolinyl"
+    "quinuclidinyl"
+    "morpholinyl"
     })    
 
 (def fragment-suffix-dictionary
@@ -65,6 +134,7 @@
     "idine"
     "crylate"
     "citric"
+    "hydratase"
     })
 
 ;; sugar lexicon entries
@@ -105,13 +175,29 @@
     "oxa"
     "phospha"
     "hydroxy"
+    "teine"
+    "osine"
+    "metha"
+    "cryl"
+
+    "glutaryl"
 
 ;; monomers
 ;;  "ox"
 ;;  "phosph"
 ;;  "ars"
 
-
+    "ferrous"
+    "sulfate"
+    "acetate"
+    "lactate"
+    "decone"
+    "kepone"
+    "cyclo"
+    "lidene"
+    "phosph"
+    "tidyl"
+    "choline"
     }))
 
 
@@ -129,6 +215,10 @@
     "glycero"
     "erythro"
     "threo"
+
+    ;; uncategorized
+    "imida"
+    "thia"
     
     }))
 
@@ -177,3 +267,10 @@
 
 (defn corpus-targetset [records]
   (set (flatten (map #(into [] (:chemdner-gold-standard %)) records))))
+
+
+(def infix-dictionary
+ #{
+   "azol"
+   "yl"
+})

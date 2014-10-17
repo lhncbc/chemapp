@@ -108,6 +108,22 @@
             (partition-all 100 record-seq)))))
    
 ;; something like: (lookup "normchem" "benzene")
-(defn lookup [collname term]
-  (seq
-   (mc/find collname {:key term})))
+(defn lookup
+  ([collname term]
+     (seq
+      (mc/find collname {:key term})))
+  ([collname field-keyword target-string]
+     (seq
+      (mc/find collname {field-keyword target-string}))))
+
+(defn list-documents
+  [dbname]
+  (mc/find-maps dbname))
+
+(defn list-docids 
+  [dbname]
+  (map #(:docid %)
+       (mc/find-maps dbname)))
+
+(defn get-document [docid]
+  (mc/find-one-as-map "training.abstracts" {:docid docid}))
