@@ -1,6 +1,7 @@
 (ns chem.mallet-ner
   (:import (java.io StringReader))
   (:require [clojure.string :as string]
+            [opennlp.nlp :as nlp]
             [chem.mallet]
             [chem.rules]
             [chem.partial :as partial]
@@ -10,8 +11,11 @@
             [chem.stopwords :as stopwords]
             [chem.token-partial :as token-partial]
             [chem.feature-generation :as fg]
-            [skr.tokenization :as tokenization])
-  (:use [chem.opennlp]))
+            [skr.tokenization :as tokenization]))
+
+(def     get-sentences (nlp/make-sentence-detector "models/en-sent.bin"))
+(defonce tokenize      (nlp/make-tokenizer "models/en-token.bin"))
+(defonce pos-tag       (nlp/make-pos-tagger "models/en-pos-maxent.bin"))
 
 (defonce ^:dynamic *crf-model* nil)
 

@@ -57,32 +57,32 @@
    subsets of tokenlist with head token with a match in the candidate list."
   [candidate tokenlist]
   (sort-by :start
-           (filter #(not (contains? stopwords/stopwords %))
-                   (set
-                    (filter #(not (empty? %))
-                            (map (fn [slice-index]
-                                   (let [index (-> candidate :token :index)
-                                         term (string/join 
-                                               (map #(:text %)
-                                                    (subvec tokenlist index (min (count tokenlist)
-                                                                                 (+ index slice-index)))))
-                                         normterm (mwi-utilities/normalize-meta-string term)
-                                         matches (:matches candidate)]
-                                     (map #(assoc % :span {:start (-> candidate :token :span :start)
-                                                           :end (+ (-> candidate :token :span :start)
-                                                                   (count (string/trim normterm)))})
-                                          (filter #(= normterm (:ncstring %))
-                                                  matches))))
-                                 (range 1 *max-slice-size*)))))))
+           (set
+            (filter #(and (not (empty? %)) (not (nil? %)))
+                    (map (fn [slice-index]
+                           (let [index (-> candidate :token :index)
+                                 term (string/join 
+                                       (map #(:text %)
+                                            (subvec tokenlist index (min (count tokenlist)
+                                                                         (+ index slice-index)))))
+                                 normterm (mwi-utilities/normalize-meta-string term)
+                                 matches (:matches candidate)]
+                             (map #(assoc % :span {:start (-> candidate :token :span :start)
+                                                   :end (+ (-> candidate :token :span :start)
+                                                           (count (string/trim normterm)))})
+                                  (filter #(= normterm (:ncstring %))
+                                          matches))))
+                         (range 1 *max-slice-size*))))))
 
 (defn find-exact-matches
   "Find any exact matches in tokenlist from partial match list."
   [partial-match-list tokenlist]
-  (flatten
-   (filter #(not (empty? %))
-           (map (fn [partial-match]
-                  (get-exact-matches partial-match tokenlist))
-                partial-match-list))))
+  (filter #(not (contains? stopwords/stopwords (:text %)))
+          (flatten
+           (filter #(not (empty? %))
+                   (map (fn [partial-match]
+                          (get-exact-matches partial-match tokenlist))
+                        partial-match-list)))))
 
 (defn process-document
   [document]

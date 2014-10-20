@@ -143,3 +143,29 @@
                             (func (:title record))
                             :abstract-result 
                             (func (:abstract record))))))
+
+(defn generate-nested-discard-set
+  "Generate set of annotations to be discarded because of begin nested
+  inside another annotation."
+  [annotation-list]
+  (let [sorted-annotation-list (vec (sort-by #(-> % :span :start) annotation-list))]
+    (reduce (fn [newset [e-annot & targets]]
+              (clojure.set/union newset 
+                                 (set 
+                                  (map #(:span %)
+                                       (filter (fn [t-annot]
+                                                 (and (>= (-> t-annot :span :start)
+                                                          (-> e-annot :span :start))
+                                                      (<= (-> t-annot :span :end)
+                                                          (-> e-annot :span :end))))
+                                               targets)))))
+            #{} (concat (partition 4 1 sorted-annotation-list)
+                        (partition 2 1 (take-last 4 sorted-annotation-list))))))
+
+(defn remove-nested-annotations
+  "Remove annotations nested inside another annotation."
+  [annotation-list]
+  (let [discardset (generate-nested-discard-set annotation-list)]
+    (filter #(and (not (nil? %))
+                  (not (contains? discardset (-> % :span))))
+            annotation-list)))

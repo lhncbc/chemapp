@@ -38,7 +38,8 @@
         result1 (lucene-normchem/process-document document)]
     (hash-map
      :spans       (combine-spans (result0 :spans) (result1 :spans))
-     :annotations (combine-annotations (result0 :annotations) (result1 :annotations)))))
+     :annotations (annot/remove-nested-annotations 
+                   (combine-annotations (result0 :annotations) (result1 :annotations))))))
 
 (defn combination-2
   "Normalized Chemical Match (MongoDB) plus Mallet CRF"
@@ -47,13 +48,16 @@
         result1 (normchem/process-document document)]
     (hash-map
      :spans       (combine-spans (result0 :spans) (result1 :spans))
-     :annotations (combine-annotations (result0 :annotations) (result1 :annotations)))))
+     :annotations (annot/remove-nested-annotations 
+                   (combine-annotations (result0 :annotations) (result1 :annotations))))))
 
 (defn combination-3
   "Normalized Chemical Match (Lucene) plus Mallet CRF"
  [document]
   (let [result0 (mallet-ner/process-document document)
-        result1 (lucene-normchem/process-document document)]
+        result1 (lucene-normchem/process-document document)
+        annotations (annot/remove-nested-annotations 
+                     (combine-annotations (result0 :annotations) (result1 :annotations)))]
     (hash-map
-     :spans       (combine-spans (result0 :spans) (result1 :spans))
-     :annotations (combine-annotations (result0 :annotations) (result1 :annotations)))))
+     :spans       (map #(:span %) annotations)
+     :annotations annotations)))
