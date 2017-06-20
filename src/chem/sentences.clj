@@ -2,24 +2,21 @@
   (:import (java.io BufferedReader FileReader FileWriter))
   (:import (java.util.regex Matcher Pattern))
   (:require [clojure.string :as string]
-            [opennlp.nlp :as nlp]
+            [clojure.set :refer [intersection]]
             [skr.tokenization :as mm-tokenization]
             [chem.span-utils :as span-utils]
             [chem.stopwords :as stopwords]
             [skr.mwi-utilities :as mwi-utilities]
             [chem.annotation-utils :as annotation-utils]
-            [chem.extract-abbrev :as extract-abbrev]))
-
-(def     get-sentences (nlp/make-sentence-detector "models/en-sent.bin"))
-(defonce tokenize      (nlp/make-tokenizer "models/en-token.bin"))
-(defonce pos-tag       (nlp/make-pos-tagger "models/en-pos-maxent.bin"))
-(def ^:dynamic *max-slice-size* 15)
+            [chem.extract-abbrev :as extract-abbrev]
+            [chem.opennlp :refer [get-sentences tokenize pos-tag]])
+  (:gen-class))
 
 (defn make-sentence-list 
-  [document]
+  [^String document]
   (map #(hash-map :sentence %
-                  :span {:start (.indexOf document %)
-                         :end (+ (.indexOf document %) (count %))})
+                  :span {:start (.indexOf document ^String %)
+                         :end (+ (.indexOf document ^String %) (count %))})
        (get-sentences document)))
 
 (defn tokenize-sentences
@@ -44,17 +41,17 @@
   with keywords :part-of-speech :text and :span.  If passing a
   sentence map structure (smap) then add mapping :pos-tags-enhanced to
   hold token map. "
-  ([sentence-text sentence-span tagged-tokenlist]
-     (map (fn [token]
-            (let [token-text (nth token 0)
-                  sentence-start (:start sentence-span) 
-                  start (.indexOf sentence-text token-text) ;start within sentence
-                  end   (+ start (count token-text))]
-              (hash-map :text token-text
-                        :part-of-speech (nth token 1)
-                        :span {:start (+ sentence-start start)
-                               :end   (+ sentence-start start (count token-text))})))
-          tagged-tokenlist))
+  ([^String sentence-text sentence-span tagged-tokenlist]
+   (map (fn [token]
+          (let [^String token-text (nth token 0)
+                sentence-start (:start sentence-span) 
+                start (.indexOf sentence-text token-text) ;start within sentence
+                end   (+ start (count token-text))]
+            (hash-map :text token-text
+                      :part-of-speech (nth token 1)
+                      :span {:start (+ sentence-start start)
+                             :end   (+ sentence-start start (count token-text))})))
+        tagged-tokenlist))
   ([sentence-smap]
      (assoc sentence-smap 
        :pos-tags-enhanced 
@@ -97,8 +94,8 @@
 (defn find-pattern-1
   "Return list of extents matching pattern
    This is implemented using Java methods, Clojure method would be shorter" 
-  [pattern-expression passage]
-  (let [pattern-pattern (Pattern/compile pattern-expression)
+  [^String pattern-expression ^String passage]
+  (let [^Pattern pattern-pattern (Pattern/compile pattern-expression)
         pattern-string-matcher (.matcher pattern-pattern passage)]
     (loop [extents []]
       (if (not (.find pattern-string-matcher))
@@ -109,7 +106,7 @@
 
 (defn find-pattern  "Return list of extents matching pattern
    This is implemented using Java methods, Clojure method would be shorter" 
-  [pattern passage]
+  [^Pattern pattern ^String passage]
   (let [pattern-string-matcher (.matcher pattern passage)]
     (loop [extents []]
       (if (not (.find pattern-string-matcher))
@@ -139,29 +136,38 @@
          (find-term new-text text)))
 
 (defn add-valid-abbreviation-annotations
+  "Add any abbreviations that map to entities to annotation list."
   [text annotation-list abbrev-list]
-  (let [abbrev-map (make-abbrev-map abbrev-list)]
-    (flatten
-     (map (fn [annotation] 
-            (if (contains? abbrev-map (:text annotation))
-              (if (= (string/lower-case (-> (abbrev-map (:text annotation)) :long-form :text))
-                     (string/lower-case (:text annotation)))
-                (do 
-                  (print (format "%s -> long form: %s:%s\n" (:text annotation)
-                                 (-> (abbrev-map (:text annotation)) :long-form :text)
-                                 (-> (abbrev-map (:text annotation)) :short-form :text)))
-                  (cons annotation
-                        (make-annotations text
-                                          annotation
-                                          (-> (abbrev-map (:text annotation)) :short-form :text))))
-                (do 
-                  (print (format "%s -> short form: %s:%s\n" (:text annotation)
-                                 (-> (abbrev-map (:text annotation)) :short-form :text)
-                                 (-> (abbrev-map (:text annotation)) :long-form :text)))
-                  (cons annotation
-                        (make-annotations text
-                                          annotation
-                                          (-> (abbrev-map (:text annotation)) :short-form :text)))))
-              annotation))
-          annotation-list))))
-
+  (if (empty? abbrev-list)
+    annotation-list
+    (let [abbrev-text-set (set (map #(-> % :long-form :text string/lower-case) abbrev-list))
+          annot-text-set (set (map #(-> % :text string/trim string/lower-case) annotation-list))]
+      (if (empty? (intersection abbrev-text-set annot-text-set))
+        ;; if no long form of abbreviation is in the entity set then return the annotation list unchanged
+        annotation-list
+        ;; else add any abbreviations that map to entities.
+        (let [abbrev-map (make-abbrev-map abbrev-list)]
+          (flatten
+           (map (fn [annotation] 
+                  (if (contains? abbrev-map (:text annotation))
+                    (if (= (string/lower-case (-> (abbrev-map (:text annotation)) :long-form :text))
+                           (string/lower-case (:text annotation)))
+                      (do 
+                        (print (format "%s -> long form: %s:%s\n" (:text annotation)
+                                       (-> (abbrev-map (:text annotation)) :long-form :text)
+                                       (-> (abbrev-map (:text annotation)) :short-form :text)))
+                        (cons annotation
+                              (make-annotations text
+                                                annotation
+                                                (-> (abbrev-map (:text annotation)) :short-form :text))))
+                      (do 
+                        (print (format "%s -> short form: %s:%s\n" (:text annotation)
+                                       (-> (abbrev-map (:text annotation)) :short-form :text)
+                                       (-> (abbrev-map (:text annotation)) :long-form :text)))
+                        (cons annotation
+                              (make-annotations text
+                                                annotation
+                                                (-> (abbrev-map (:text annotation)) :short-form :text)))))
+                    annotation))
+                annotation-list)))))))
+  
