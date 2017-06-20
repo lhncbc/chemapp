@@ -1,8 +1,7 @@
 (ns chem.chemdner-paths)
 
-(def biocreative-root "/nfsvol/nlsaux16/II_Group_WorkArea/Lan/projects/BioCreative/2013")
-
-(def biocreative-root "/nfsvol/nlsaux16/II_Group_WorkArea/Lan/projects/BioCreative/2013")
+;; (def biocreative-root "/nfsvol/nlsaux16/II_Group_WorkArea/Lan/projects/BioCreative/2013")
+(def biocreative-root "/net/lhcdevfiler/vol/cgsb5/ind/II_Group_WorkArea/Lan/projects/BioCreative/2013")
 
 (def training-dir (str biocreative-root "/CHEMDNER_TRAIN_V01"))
 (def training-text (str training-dir "/chemdner_abs_training.txt"))

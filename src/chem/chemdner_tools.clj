@@ -22,7 +22,7 @@
                   :abstract (nth fields 2))))
     (line-seq (BufferedReader. (FileReader. filename))))))
 
-(defn mongodb-abstract-fields-recfn
+(defn abstract-fields-recfn
   "Each input record is of form
 
       [id title abstract]
@@ -43,7 +43,7 @@
             :title    (nth fields 1)
             :abstract (nth fields 2)))
 
-(defn mongodb-hash-recfn [record]
+(defn hash-recfn [record]
   record)
 
 ;; ## 3) Training data annotations: 
