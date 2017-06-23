@@ -95,6 +95,11 @@
                              list-of-tokenlists))
                    (list-combinations mapped-tokenlist)))))
 
+(defn find-matches-in-tagged-sentence
+  [tagged-sentence]
+  (sort-by #(-> % :span :start)
+           (set (find-longest-matches (:pos-tags-enhanced tagged-sentence)))))
+
 (defn process-document
   "Process document, returning spans, abbreviations, and MeSH ids."
   [document]
@@ -105,13 +110,11 @@
                                  sentences/enhance-sentence-list-pos-tags)
         abbrev-list (extract-abbrev/extract-abbr-pairs-string document)
         enhanced-annotation-list (mapcat (fn [tagged-sentence]
-                                        (let [annotation-list0 (find-longest-matches (:pos-tags-enhanced tagged-sentence))
-                                              annotation-list (sort-by #(-> % :span :start) (set annotation-list0))]
-                                          (sentences/add-valid-abbreviation-annotations document
-                                                                                        annotation-list
-                                                                                        abbrev-list)))
-                                      tagged-sentence-list)]
-
+                                           (let [annotation-list (find-matches-in-tagged-sentence tagged-sentence)]
+                                             (sentences/add-valid-abbreviation-annotations document
+                                                                                           annotation-list
+                                                                                           abbrev-list)))
+                                         tagged-sentence-list)]
     (hash-map :spans (mapv #(:span %) enhanced-annotation-list)
               :annotations enhanced-annotation-list
               :tagged-sentence-list tagged-sentence-list
@@ -138,14 +141,12 @@
                                  sentences/enhance-sentence-list-pos-tags)
         abbrev-list (extract-abbrev/extract-abbr-pairs-string document)
         enhanced-annotation-list (mapcat (fn [tagged-sentence]
-                                           (let [annotation-list0 (find-longest-matches (:pos-tags-enhanced tagged-sentence))
-                                                 annotation-list (sort-by #(-> % :span :start) (set annotation-list0))]
+                                           (let [annotation-list (find-matches-in-tagged-sentence tagged-sentence)]
                                              (sentences/add-valid-abbreviation-annotations document
                                                                                            annotation-list
-                                                                                           abbrev-list)
-                                             ))
-                                         tagged-sentence-list)]    
-    (set (mapv #(clojure.string/trim (:keyterm %))
+                                                                                           abbrev-list)))
+                                         tagged-sentence-list)]
+    (set (mapv #(clojure.string/trim (:ncstring %))
                enhanced-annotation-list))))
 
 
