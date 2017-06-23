@@ -17,13 +17,17 @@
   (let [^InvertedFileContainer container (get-container tablepath indexpath)]
     (.get container indexname)))
 
+(def ^:dynamic *normchem-fields* [:ncstring :meshid :cid :smiles :synonym0 :synonym1]) 
+
 (defn record-to-map
   "convert piped-separated normchem record to clojure mapped structure."
-  [record]
-  (into {}
-        (conj (map #(vector %1 %2)
-                   [:keyterm :meshid :pubchemid :smiles :synonym0 :synonym1] (split record #"\|"))
-              (vector :record record))))
+  ([record]
+   (record-to-map record *normchem-fields*))
+  ([record fieldlist]
+   (into {}
+         (conj (map #(vector %1 %2)
+                    fieldlist (split record #"\|"))
+               (vector :record record)))))
 
 (defn lookup
   "lookup term"
