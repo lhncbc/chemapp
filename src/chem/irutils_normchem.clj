@@ -42,7 +42,6 @@
 (defonce indexpath (str ivfpath "/normchem/indices"))
 (defonce indexname "normchem2017")
 (def ^:dynamic *normchem-index* (irutils/create-index tablepath indexpath indexname))
-(def annot-fields [:keyterm :text :meshid :pubchemid :synonym0 :synonym1 :span])
 
 (defn lookup
   "Return list of terms that approximately match normalized form of
@@ -73,28 +72,28 @@
                               :end (-> tokenlist last :span :end)}))
        entitylist))
 
+(defn list-combinations
+  "Generate all possible sublist combinations of supplied list."
+  [itemlist]
+  (mapv (fn [subitemlist]
+          (mapv (fn [subsubitemlist]
+                  subsubitemlist)
+                (list-head-proper-sublists subitemlist)))
+        (list-tail-proper-sublists itemlist)))
+
 (defn find-longest-matches
   "Return the longest spanning entities in supplied token lists
   removing any entities that are subsumed by a longer matching entity."
   [mapped-tokenlist]
-  (filter #(not (nil? %))
+  (filter #(not (empty? %))
           (annotation-utils/remove-subsumed-annotations
-           (apply concat
-                  (map (fn [subtokenlist]
-                         (let [list-of-lists (list-head-proper-sublists subtokenlist)]
-                           (loop [subtokenlist (first list-of-lists)
-                                  rest-tokenlists (rest list-of-lists)
-                                  entitylist (add-spans-to-entitylist
-                                              (lookup (join "" (mapv #(:text %) subtokenlist)))
-                                              subtokenlist)]
-                             (cond (seq entitylist)  entitylist
-                                   (empty? (first rest-tokenlists)) []
-                                   :else (recur (first rest-tokenlists)
-                                                (rest rest-tokenlists)
-                                                (add-spans-to-entitylist
-                                                 (lookup (join "" (mapv #(:text %) (rest subtokenlist))))
-                                                 (rest subtokenlist)))))))
-                       (list-tail-proper-sublists mapped-tokenlist))))))
+           (mapcat (fn [list-of-tokenlists]
+                     (mapcat (fn [tokenlist]
+                               (add-spans-to-entitylist
+                                (lookup (join "" (mapv #(:text %) tokenlist)))
+                                tokenlist))
+                             list-of-tokenlists))
+                   (list-combinations mapped-tokenlist)))))
 
 (defn process-document
   "Process document, returning spans, abbreviations, and MeSH ids."
@@ -104,21 +103,19 @@
                                  sentences/tokenize-sentences
                                  sentences/pos-tag-sentence-list
                                  sentences/enhance-sentence-list-pos-tags)
-        sentence-tokenlist (vec (apply concat (map #(:pos-tags-enhanced %) tagged-sentence-list)))
-        doc-tokenlist (mm-tokenization/analyze-text document)
-        tokenlist (sentences/add-pos-tags-to-document-tokenlist doc-tokenlist sentence-tokenlist)
         abbrev-list (extract-abbrev/extract-abbr-pairs-string document)
-        annotation-list0 (find-longest-matches tokenlist)
-        annotation-list (sort-by #(-> % :span :start) (set annotation-list0))
-        enhanced-annotation-list (sentences/add-valid-abbreviation-annotations document
-                                                                               annotation-list
-                                                                               abbrev-list)]
+        enhanced-annotation-list (mapcat (fn [tagged-sentence]
+                                        (let [annotation-list0 (find-longest-matches (:pos-tags-enhanced tagged-sentence))
+                                              annotation-list (sort-by #(-> % :span :start) (set annotation-list0))]
+                                          (sentences/add-valid-abbreviation-annotations document
+                                                                                        annotation-list
+                                                                                        abbrev-list)))
+                                      tagged-sentence-list)]
+
     (hash-map :spans (mapv #(:span %) enhanced-annotation-list)
               :annotations enhanced-annotation-list
-              :sentence-list tagged-sentence-list
-              :tokenlist tokenlist
+              :tagged-sentence-list tagged-sentence-list
               :abbrev-list abbrev-list)))
-
 
 (defn process-document-explore
   [document]
@@ -134,14 +131,20 @@
   "Process document, returning set of unique terms found (including
   abbreviations)."
   [document]
-  (let [tokenlist (mm-tokenization/analyze-text document)
+  (let [tagged-sentence-list (-> document
+                                 sentences/make-sentence-list
+                                 sentences/tokenize-sentences
+                                 sentences/pos-tag-sentence-list
+                                 sentences/enhance-sentence-list-pos-tags)
         abbrev-list (extract-abbrev/extract-abbr-pairs-string document)
-        annotation-list (find-longest-matches tokenlist)
-        enhanced-annotation-list (if (empty? annotation-list)
-                                   annotation-list
-                                   (sentences/add-valid-abbreviation-annotations document
-                                                                                 annotation-list
-                                                                                 abbrev-list))]
+        enhanced-annotation-list (mapcat (fn [tagged-sentence]
+                                           (let [annotation-list0 (find-longest-matches (:pos-tags-enhanced tagged-sentence))
+                                                 annotation-list (sort-by #(-> % :span :start) (set annotation-list0))]
+                                             (sentences/add-valid-abbreviation-annotations document
+                                                                                           annotation-list
+                                                                                           abbrev-list)
+                                             ))
+                                         tagged-sentence-list)]    
     (set (mapv #(clojure.string/trim (:keyterm %))
                enhanced-annotation-list))))
 
