@@ -1,21 +1,20 @@
 (ns chem.core
-  (:use [compojure.core]
-        [hiccup.core]
-        [hiccup.page]
-        [hiccup.util]
-        [ring.middleware.params :only [wrap-params]]
-        [clojure.pprint]
-        [chem.html-views])
-  (:require [chem.process :as process]
-            [chem.utils :as utils]
-            [chem.annotations :as annot]
-            [chem.chemdner-tools :as chemdner-tools]
+  (:require [chem.chemdner-tools :as chemdner-tools]
             [chem.pipeline :as pipeline]
+            [chem.socketserver :as socketserver ]
             [clojure.string :as string])
-  (:import (java.net URLDecoder URLEncoder))
+  (:use [clojure.pprint])
   (:gen-class))
 
 (defn -main
+  "Start socket server using defaults"
+  [& args]
+  (if (empty? args)
+    (socketserver/init)
+    (socketserver/init (nth args 0))))
+
+
+(defn previous-main
   "I don't do a whole lot ... yet."
   [& args]
   (println "Chemical Annotator")
@@ -27,24 +26,5 @@
             
             ))
         args)))
-
-(defroutes 
-  viewer-routes
-  (GET "/" []
-       (frontpage))
-
-  (GET "/adhoc/" []
-       (adhoc-page))
-
-  (GET "/chemdner/" []
-       (chemdner-page))
-
-  (GET "/chemdner/:docid/" [docid]
-       (view-chemdner-output docid))
-
-  (POST "/adhoc/process/" [document engine]
-        (view-adhoc-output document engine (process/process engine document))))
-
-(def app (wrap-params viewer-routes))
 
 
