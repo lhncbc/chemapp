@@ -1,17 +1,20 @@
 (ns chem.process
-  (:require [metamap-api.metamap-api :as mm-api]
+  (:require [clojure.java.io :as io]
+            [metamap-api.metamap-api :as mm-api]
             [chem.annotations :as annot]
             [chem.metamap-annotation :as mm-annot]
             [skr.tokenization :as mm-tokenization]
             [chem.semtypes :as semtypes]
             [chem.partial :as partial]
             [chem.partial-enhanced :as partial-enhanced]
-            [chem.normchem :as normchem]
+            [chem.irutils-normchem :as irutils-normchem]
             [chem.lucene-normchem :as lucene-normchem]
             [chem.combine-recognizers :as combinelib]
-            [chem.mongodb :as chemdb]
-            [clojure.set]
-            [chem.mallet-ner :as mallet-ner])
+            [clojure.set :refer [union intersection]]
+            [chem.mallet-ner :as mallet-ner]
+            [chem.cdi :refer [write-cdi-result]]
+            [chem.brat :refer [write-brat]]
+            [chem.utils :as utils])
   (:gen-class))
 
 (defonce bad-engines 
@@ -25,21 +28,10 @@
              :label "MetaMap"}
    })
 
-(def ^:dynamic *engine-map*
-  (sorted-map 
-   :lucene-normchem {:func (fn [document] (lucene-normchem/process-document document))
-                     :label "Normalized Chemical Match (lucene)"}
-   :token   {:func (fn [document]
-                    (mm-tokenization/gen-token-annotations document))
-             :label "Token"}
-   :token-enhanced {:func (fn [document]
-                            (let [mmapi-inst (mm-api/api-instantiate)]
-                              (mm-annot/get-enhanced-annotations
-                               mmapi-inst 
-                               (:annotations (mm-tokenization/gen-token-annotations document)))))
-                    :label "Token Enchanced"}
-   :partial  {:func partial/process-document
-              :label "Partial Chemical Match"}
+(defonce disabled-engines
+  {
+   ;; :mongodb-normchem {:func (fn [document] (normchem/process-document document))
+   ;;            :label "Normalized Chemical Match (MongoDB)"}
    :partial-enhanced {:func (fn [document]
                               (let [mmapi-inst (mm-api/api-instantiate)]
                                 (partial-enhanced/match mmapi-inst document)))
@@ -52,16 +44,37 @@
                                     (let [mmapi-inst (mm-api/api-instantiate)]
                                       (partial-enhanced/filter-match2 mmapi-inst document)))
                             :label "Partial Chemical Token Filtered"}
+   :token-enhanced {:func (fn [document]
+                            (let [mmapi-inst (mm-api/api-instantiate)]
+                              (mm-annot/get-enhanced-annotations
+                               mmapi-inst 
+                               (:annotations (mm-tokenization/gen-token-annotations document)))))
+                    :label "Token Enchanced"}
+   })
+
+(def ^:dynamic *engine-map*
+  (sorted-map
+   :irutils {:func (fn [document] (irutils-normchem/process-document document))
+                     :label "Normalized Chemical Match (irutils)"}
+   :lucene {:func (fn [document] (lucene-normchem/process-document document))
+                     :label "Normalized Chemical Match (Lucene)"}
+   :token   {:func (fn [document]
+                    (mm-tokenization/gen-token-annotations document))
+             :label "Token"}
+   :partial  {:func partial/process-document
+              :label "Partial Chemical Match"}
    :fragment {:func (fn [document] (partial/fragment-match document))
               :label "Fragment"}
-   :mongodb-normchem {:func (fn [document] (normchem/process-document document))
-              :label "Normalized Chemical Match (mongodb)"}
    :combine1 {:func combinelib/combination-1
-              :label "Normalized Chemical Match  plus Partial Chemical Match"}
+              :label "Normalized Chemical Match (Lucene) plus Partial Chemical Match"}
    :combine2 {:func combinelib/combination-2
-              :label "Normalized Chemical Match (mongodb) plus Mallet NER"}
+              :label "Normalized Chemical Match (IRUtils) plus Partial Chemical Match"}
    :combine3 {:func combinelib/combination-3
-              :label "Normalized Chemical Match (lucene) plus Mallet NER"}
+              :label "Normalized Chemical Match (Lucene) plus Mallet NER"}
+   :combine4 {:func combinelib/combination-4
+              :label "Normalized Chemical Match (Lucene) plus Partial Chemical Match plus Mallet NER"}
+   :combine5 {:func combinelib/combination-5
+              :label "Normalized Chemical Match (IRUtils) plus Mallet NER"}
    :mallet   {:func mallet-ner/process-document
               :label "Mallet NER"}
    ))
@@ -79,6 +92,11 @@
   [engine document]
   (when (contains? *engine-map* (keyword engine))
     ((-> engine keyword *engine-map* :func) document)))
+
+(defn get-engine-label
+ [engine]
+ (when (contains? *engine-map* (keyword engine))
+   (-> engine keyword *engine-map* :label)))
 
 (defonce ^:dynamic *doc-seq-engine-map*
   {:metamap (fn [document-seq]
@@ -99,8 +117,12 @@
                                        (partial-enhanced/match2 mmapi-inst document))
                                      document-seq)))
    :fragment (fn [document-seq] (map partial/fragment-match    document-seq))
-   :normchem (fn [document-seq] (map normchem/process-document document-seq))
-   :combine1 (fn [document-seq] (map combinelib/combination-1  document-seq))})
+   :lucene   (fn [document-seq] (map lucene-normchem/process-document document-seq))
+   :irutils  (fn [document-seq] (map irutils-normchem/process-document document-seq))
+   :normchem (fn [document-seq] (map lucene-normchem/process-document document-seq))
+   :combine1 (fn [document-seq] (map combinelib/combination-1  document-seq))
+   :combine2 (fn [document-seq] (map combinelib/combination-2  document-seq))
+})
 
 (defn process-document-seq
   "Generate annotations from raw document sequence text."
@@ -173,7 +195,19 @@
   ^{:doc "Add normchem annotations to document."}
   [document]
   (conj document 
-        (annotate-chemdner-document normchem/process-document "normchem" document)))
+        (annotate-chemdner-document lucene-normchem/process-document "normchem" document)))
+
+(defn add-irutils-normchem-annotations 
+  ^{:doc "Add normchem annotations to document."}
+  [document]
+  (conj document 
+        (annotate-chemdner-document irutils-normchem/process-document "normchem" document)))
+
+(defn add-lucene-normchem-annotations 
+  ^{:doc "Add normchem annotations to document."}
+  [document]
+  (conj document 
+        (annotate-chemdner-document lucene-normchem/process-document "normchem" document)))
 
 (defn filter-partial-match-using-normchem [document]
  ^{:doc "Keep partial-match annotations that are represented in
@@ -189,7 +223,7 @@
                                          (let [result 
                                                (into
                                                 {} 
-                                                (normchem/nmslookup "nmsnormchem" (:text annotation)))]
+                                                (lucene-normchem/nmslookup "nmsnormchem" (:text annotation)))]
                                            (if result 
                                              (merge annotation {:meshid (result "meshid")
                                                                 :pubchemid (result "pubchemid")
@@ -206,7 +240,7 @@
                                          (let [result 
                                                (into
                                                 {} 
-                                                (normchem/nmslookup "nmsnormchem" (:text annotation)))]
+                                                (lucene-normchem/nmslookup "nmsnormchem" (:text annotation)))]
                                            (if result 
                                              (merge annotation {:meshid (result "meshid")
                                                                 :pubchemid (result "pubchemid")
@@ -222,7 +256,7 @@
     (let [acronym-set (set (map (fn [el]
                                   (:acronym el))
                                 (:acronyms document)))
-          normchem-document (annotate-chemdner-document normchem/process-document "normchem" document)
+          normchem-document (annotate-chemdner-document lucene-normchem/process-document "normchem" document)
           normchem-annotset (:normchem normchem-document)]
       (conj document 
             (hash-map :normchem
@@ -321,7 +355,6 @@
   "Use flow1 on documents in document sequence previously annotated by
   function add-metamap-annotations."
   [mm-annotated-document-seq]
-  (chemdb/remote-init)                         ; connect to "chem" mongodb database
   (map flow1 mm-annotated-document-seq))
 
 (defn subsume-flow 
@@ -398,7 +431,8 @@
          
          token-results)))
 
-(defn process-chemdner-document [engine document]
+(defn process-chemdner-document-original
+  [engine document]
   (conj document 
         (hash-map (keyword engine)
                   (case engine
@@ -424,7 +458,8 @@
                                                (hash-map :title-result    (partial-enhanced/filter-match2 mmapi-inst (:title document))
                                                          :abstract-result (partial-enhanced/filter-match2 mmapi-inst (:abstract document))))
                     "fragment" (annotate-chemdner-document partial/fragment-match document)
-                    "normchem" (annotate-chemdner-document normchem/process-document document)
+                    "normchem" (annotate-chemdner-document lucene-normchem/process-document document)
+                    "irutils-normchem" (annotate-chemdner-document irutils-normchem/process-document document)
                     "combine1" (annotate-chemdner-document combinelib/combination-1 document)))))
 
 (defn process-chemdner-document-seq [engine document-seq]
@@ -469,7 +504,7 @@
                                                                 :abstract-result (partial-enhanced/filter-match2 mmapi-inst (:abstract document))))))
                                     document-seq))
     "fragment" (map #(conj % (annotate-chemdner-document partial/fragment-match engine %)) document-seq)
-    "normchem" (doall (map #(conj % (annotate-chemdner-document normchem/process-document engine %)) document-seq))
+    "normchem" (doall (map #(conj % (annotate-chemdner-document lucene-normchem/process-document engine %)) document-seq))
     "combine1" (doall (map #(conj % (annotate-chemdner-document combinelib/combination-1 engine %)) document-seq))))
 
 
@@ -480,22 +515,61 @@
   (map-flow metamap-partial-records subsume-flow))
 
 (def ^:dynamic *chemdner-engine-map*
-  {:lucene-normchem {:func (fn [document engine]
+  {:normchem {:func (fn [document engine]
                       (annotate-chemdner-document lucene-normchem/process-document engine document))}
+   :irutils-normchem {:func (fn [document engine]
+                      (annotate-chemdner-document irutils-normchem/process-document engine document))}
    :partial  {:func (fn [document engine]
                       (annotate-chemdner-document partial/match engine document))}
-   :normchem {:func (fn [document engine]
-                      (annotate-chemdner-document normchem/process-document engine document))}
    :combine1 {:func (fn [document engine]
                       (annotate-chemdner-document combinelib/combination-1 engine document))}
    :combine2 {:func (fn [document engine]
                       (annotate-chemdner-document combinelib/combination-2 engine document))}
    :combine3 {:func (fn [document engine]
                       (annotate-chemdner-document combinelib/combination-3 engine document))}
+   :combine5 {:func (fn [document engine]
+                      (annotate-chemdner-document combinelib/combination-5 engine document))}
 })
 
 (defn process-chemdner-document
- [document engine]
+ [engine document]
   (when (contains? *chemdner-engine-map* (keyword engine))
     ((-> engine keyword *chemdner-engine-map* :func) document engine)))
 
+(def ^:dynamic *chemdner-index-engine-map*
+  {:irutils-normchem {:func (fn [document engine]
+                              (annotate-chemdner-document irutils-normchem/index-document engine document))}
+   :combine5 {:func (fn [document engine]
+                      (annotate-chemdner-document combinelib/index-combination-5 engine document))}
+   })
+
+(defn index-chemdner-document
+  [engine document]
+  (let [result (when (contains? *chemdner-index-engine-map* (keyword engine))
+                 ((-> engine keyword *chemdner-index-engine-map* :func) document engine))]
+    (hash-map :docid (:docid document)
+              :terms (union
+                      (->> (get result (keyword engine))
+                           :title-result)
+                      (->> (get result (keyword engine))
+                           :abstract-result)))))
+
+(defn write-cdi-results
+  "Write result list to file in CDI (Chemdner Document indexing) format."
+  [directory engine document-list]
+  (dorun
+   (map (fn [document]
+           (write-cdi-result (format "%s/%s.cdi" directory (:docid document))
+                             (index-chemdner-document engine document)))
+         document-list)))
+
+(defn process-brat-txt-files
+  [dirname]
+  (let [filelist (utils/list-of-files dirname)
+        txtfilelist (filter #(> (.indexOf % ".txt") 0) filelist)]
+    (map
+     (fn [infn]
+       (let [outfn (str dirname "/" (utils/basename infn ".txt") ".ann")]
+         (write-brat (:annotations (process :combine3 (slurp (str dirname "/" infn))))
+                          outfn)))
+     txtfilelist)))
