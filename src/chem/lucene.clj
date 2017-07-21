@@ -8,25 +8,28 @@
            (org.apache.lucene.util Version)
            (org.apache.lucene.analysis.en EnglishAnalyzer)))
 
-(def ^:dynamic *nindex* (FSDirectory/open (File. "/rhome/wjrogers/lucenedb/example")))
-(def ^:dynamic *ireader* (DirectoryReader/open *nindex*))
-(def ^:dynamic *query-parser* (QueryParser. Version/LUCENE_CURRENT, "term", (EnglishAnalyzer.)))
-(def ^:dynamic *norm-query-parser* (QueryParser. Version/LUCENE_CURRENT, "nterm", (EnglishAnalyzer.)))
-(def ^:dynamic *isearcher* (IndexSearcher. *ireader*))
+;; (def ^:dynamic *nindex* (FSDirectory/open
+;;                          (File. "data/lucenedb/mwinormchem2015")))
+;; (def ^:dynamic *ireader* (DirectoryReader/open *nindex*))
+;; (def ^:dynamic *query-parser* (QueryParser. Version/LUCENE_CURRENT, "term", (EnglishAnalyzer.)))
+;; (def ^:dynamic *norm-query-parser* (QueryParser. Version/LUCENE_CURRENT, "nterm", (EnglishAnalyzer.)))
+;; (def ^:dynamic *isearcher* (IndexSearcher. *ireader*))
 
-(defn reinit 
-  ([] (reinit "/rhome/wjrogers/lucenedb/example"))
-  ([dir-name]
-     (def ^:dynamic *nindex* (FSDirectory/open (File. dir-name)))
-     (def ^:dynamic *ireader* (DirectoryReader/open *nindex*))
-     (def ^:dynamic *query-parser* (QueryParser. Version/LUCENE_CURRENT, "term", (EnglishAnalyzer.)))
-     (def ^:dynamic *norm-query-parser* (QueryParser. Version/LUCENE_CURRENT, "nterm", (EnglishAnalyzer.)))
-     (def ^:dynamic *isearcher* (IndexSearcher. *ireader*))  ))
+(defn init 
+  ([] (init "data/lucenedb/mwinormchem2015"))
+  ([^String dir-name]
+   (def ^:dynamic ^FSDirectory *nindex* (FSDirectory/open ^File (File. dir-name)))
+   (def ^:dynamic ^DirectoryReader *ireader* (DirectoryReader/open *nindex*))
+   (def ^:dynamic ^QueryParser *query-parser* (QueryParser. Version/LUCENE_CURRENT, "term", (EnglishAnalyzer.)))
+   (def ^:dynamic ^QueryParser *norm-query-parser* (QueryParser. Version/LUCENE_CURRENT,
+                                                                 "nterm",
+                                                                 ^EnglishAnalyzer (EnglishAnalyzer.)))
+   (def ^:dynamic ^IndexSearcher *isearcher* (IndexSearcher. *ireader*))  ))
 
 (defn lookup 
   "lookup term"
   ([term] (lookup term 100))
-  ([term len]
+  ([^String term len]
      (let [query (.parse *query-parser* term)
            result (.search *isearcher* query nil len)
            hit-list (.scoreDocs result)]
@@ -45,7 +48,7 @@
 (defn nmslookup 
   "lookup term using normalized form of term"
   ([term] (lookup term 100))
-  ([term len]
+  ([^String term len]
      (let [query (.parse *norm-query-parser* term)
            result (.search *isearcher* query nil len)
            hit-list (.scoreDocs result)]
