@@ -1,12 +1,13 @@
 (ns chem.utils
-  (:use [clojure.pprint])
-  (:import (java.io BufferedReader FileReader FileWriter))
-  (:require [clojure.data.json :as json])
+  (:import (java.io BufferedReader FileReader FileWriter File))
+  (:require [clojure.data.json :as json]
+            [clojure.edn :as edn]
+            [clojure.pprint :refer [pprint]])
   (:gen-class))
 
 ;; ## Various utility functions
 
-(defn line-seq-from-file [file-name]
+(defn line-seq-from-file [^String file-name]
   " return a lazy seq of lines from supplied filename"
   (line-seq (BufferedReader. (FileReader. file-name))))
 
@@ -17,7 +18,7 @@
      #(prn (format "%s" (apply str (interpose delimiter %))))
      coll))))
 
-(defn write-elements-delimited [outfilename coll delimiter]
+(defn write-elements-delimited [^String outfilename coll delimiter]
   (count
    (with-open [w (java.io.FileWriter. outfilename)]
      (doall
@@ -32,7 +33,7 @@
      #(prn (format "%s" (apply str (interpose \| %))))
      coll))))
 
-(defn write-elements-piped [outfilename coll]
+(defn write-elements-piped [^String outfilename coll]
   (count
    (with-open [w (java.io.FileWriter. outfilename)]
      (doall
@@ -40,24 +41,29 @@
        #(.write w (format "%s\n" (apply str (interpose \| %))))
        coll)))))
 
-(defn print-interns [package]
+(defn print-interns
+  [package]
   (count (map prn (ns-interns package))))
 
-(defn print-elements [coll]
+(defn print-elements
+  [coll]
   (count (map prn coll)))
 
-(defn write-elements [outfilename coll]
+(defn write-elements
+  [^String outfilename coll]
   (count
    (with-open [w (java.io.FileWriter. outfilename)]
      (doall
       (map #(.write w (format "%s\n" %)) coll)))))
 
-(defn write-to-file [outfilename astr]
+(defn write-to-file
+  [^String outfilename ^String astr]
   (with-open [w (java.io.FileWriter. outfilename)]
     (.write w astr)))
 
-(defn pprint-object-to-file [filename object]
+(defn pprint-object-to-file
   "pretty print object to file."
+  [^String filename object]
   (with-open [w (java.io.FileWriter. filename)]
     (pprint object w)))
 
@@ -135,7 +141,8 @@
 ;;    byte[] data = utf.getBytes("ASCII");
 ;;    String ascii = new String(data);
 
-(defn utf8-to-ascii [text]
+(defn utf8-to-ascii
+  [^String text]
   (String. (.getBytes text "ASCII")))
 
 ;; (defn utf8-to-metamap-ascii [text]
@@ -155,7 +162,7 @@
 
 (defn maybe-string-to-primitive [element]
   (case (type element)
-   java.lang.String    (read-string element)
+   java.lang.String    (edn/read-string element)
    java.lang.Long      element
    java.lang.Integer   element
    clojure.lang.BigInt element
@@ -182,6 +189,18 @@
   "write object to file in json format."
   [outfilename obj]
   (spit outfilename (json/write-str obj)))
-  
+
+(defn list-of-files
+  [^String directory]
+  (filter #(not (nil? %))
+          (map (fn [^File aFile]
+                 (when (.isFile aFile)
+                   (.getName aFile)))
+               (.listFiles (File. directory)))))
+
+(defn basename
+  "Remove extension specified in 'ext' from filename."
+  [^String filename ^String ext]
+  (subs filename 0 (.indexOf filename ext)))
 
 ;;fin
