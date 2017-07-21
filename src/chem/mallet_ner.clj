@@ -1,7 +1,6 @@
 (ns chem.mallet-ner
   (:import (java.io StringReader))
   (:require [clojure.string :as string]
-            [opennlp.nlp :as nlp]
             [chem.mallet]
             [chem.rules]
             [chem.partial :as partial]
@@ -11,12 +10,11 @@
             [chem.stopwords :as stopwords]
             [chem.token-partial :as token-partial]
             [chem.feature-generation :as fg]
-            [skr.tokenization :as tokenization]))
+            [skr.tokenization :as tokenization]
+            [chem.opennlp :refer [get-sentences tokenize pos-tag]])
+  (:gen-class))
 
-(def     get-sentences (nlp/make-sentence-detector "models/en-sent.bin"))
-(defonce tokenize      (nlp/make-tokenizer "models/en-token.bin"))
-(defonce pos-tag       (nlp/make-pos-tagger "models/en-pos-maxent.bin"))
-
+(defonce ^:dynamic *crf-model-default-filename* "all.multi-label.seqtagcrf.model")
 (defonce ^:dynamic *crf-model* nil)
 
 (defn set-crf-model! [crf-model]
@@ -27,7 +25,7 @@
 
 (defn init 
   ([]
-     (set-crf-model-from-file! "all.multi-label.seqtagcrf.model"))
+     (set-crf-model-from-file! *crf-model-default-filename*))
   ([model-filename]
      (set-crf-model-from-file! model-filename)))
 
@@ -117,7 +115,7 @@
 
 (defn annotate-document
   [document-text location]
-  (let [document-tokenlists(extract-document-features document-text location)
+  (let [document-tokenlists (extract-document-features document-text location)
         feature-tokenlists (tag-unlabelled-document-features document-tokenlists)
         reader (new StringReader (assemble-sentences feature-tokenlists))
         result (chem.mallet/test-reader *crf-model* reader)]
