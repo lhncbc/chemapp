@@ -10,6 +10,7 @@
             [chem.annotation-utils :as annotation-utils]
             [chem.extract-abbrev :as extract-abbrev]
             [chem.sentences :as sentences]
+            [chem.greek-convert :refer [convert-greek-chars]]
             [entityrec.string-utils :refer [list-head-proper-sublists
                                             list-tail-proper-sublists]])
   (:gen-class))
@@ -28,7 +29,7 @@
 ;;     
 ;;      python dumpdb_ts.py --db=Collections/meshchem/normchem2015db normchem2015db.dump
 ;;
-;; See also, chem/irutils.clj and scripts/normchem_ivf.clj
+;; For information for index creation, see also, chem/irutils.clj and scripts/normchem_ivf.clj
 
 (defonce ^:dynamic *memoized-normalize-ast-string* (memoize mwi-utilities/normalize-ast-string))
 
@@ -52,8 +53,11 @@
                  (Character/isDigit (first term)))
              (> (count term) 2)
              (not (contains? stopwords/stopwords lcterm)))
-      (map #(assoc % :text term)
-           (irutils/lookup *normchem-index* lcterm ))
+      (set
+        (map #(assoc % :text term)
+             (concat
+              (irutils/lookup *normchem-index* lcterm )
+              (irutils/lookup *normchem-index* (convert-greek-chars lcterm)))))
       {})))
 
 (def ^:dynamic *memoized-lookup* (memoize lookup))
@@ -90,7 +94,7 @@
            (mapcat (fn [list-of-tokenlists]
                      (mapcat (fn [tokenlist]
                                (add-spans-to-entitylist
-                                (lookup (join "" (mapv #(:text %) tokenlist)))
+                                (lookup (join " " (mapv #(:text %) tokenlist)))
                                 tokenlist))
                              list-of-tokenlists))
                    (list-combinations mapped-tokenlist)))))
@@ -100,29 +104,32 @@
   (sort-by #(-> % :span :start)
            (set (find-longest-matches (:pos-tags-enhanced tagged-sentence)))))
 
-(defn process-document
+(defn gen-annotations
   "Process document, returning spans, abbreviations, and MeSH ids."
   [document]
   (let [tagged-sentence-list (-> document
                                  sentences/make-sentence-list
-                                 sentences/tokenize-sentences
+                                 (sentences/tokenize-sentences 9)
                                  sentences/pos-tag-sentence-list
-                                 sentences/enhance-sentence-list-pos-tags)
-        abbrev-list (extract-abbrev/extract-abbr-pairs-string document)
-        enhanced-annotation-list (mapcat (fn [tagged-sentence]
-                                           (let [annotation-list (find-matches-in-tagged-sentence tagged-sentence)]
-                                             (sentences/add-valid-abbreviation-annotations document
-                                                                                           annotation-list
-                                                                                           abbrev-list)))
-                                         tagged-sentence-list)]
+                                 sentences/enhance-sentence-list-pos-tags-spans-and-classes-no-ws)
+        abbrev-list (extract-abbrev/extract-abbr-pairs-string document)]
+    (mapcat (fn [tagged-sentence]
+              (let [annotation-list (find-matches-in-tagged-sentence tagged-sentence)]
+                (sentences/add-valid-abbreviation-annotations document
+                                                              annotation-list
+                                                              abbrev-list)))
+            tagged-sentence-list)))
+
+(defn process-document
+  "Process document, returning spans, abbreviations, and MeSH ids."
+  [document]
+  (let [enhanced-annotation-list (gen-annotations document)]
     (hash-map :spans (mapv #(:span %) enhanced-annotation-list)
-              :annotations enhanced-annotation-list
-              :tagged-sentence-list tagged-sentence-list
-              :abbrev-list abbrev-list)))
+              :annotations enhanced-annotation-list)))
 
 (defn process-document-explore
   [document]
-  (let [tokenlist (mm-tokenization/analyze-text document)
+  (let [tokenlist (mm-tokenization/analyze-text-chemicals-aggressive document)
         abbrev-list (extract-abbrev/extract-abbr-pairs-string document)
         annotation-list (find-longest-matches tokenlist)]
     (hash-map :spans (map #(:span %) annotation-list)
@@ -134,19 +141,7 @@
   "Process document, returning set of unique terms found (including
   abbreviations)."
   [document]
-  (let [tagged-sentence-list (-> document
-                                 sentences/make-sentence-list
-                                 sentences/tokenize-sentences
-                                 sentences/pos-tag-sentence-list
-                                 sentences/enhance-sentence-list-pos-tags)
-        abbrev-list (extract-abbrev/extract-abbr-pairs-string document)
-        enhanced-annotation-list (mapcat (fn [tagged-sentence]
-                                           (let [annotation-list (find-matches-in-tagged-sentence tagged-sentence)]
-                                             (sentences/add-valid-abbreviation-annotations document
-                                                                                           annotation-list
-                                                                                           abbrev-list)))
-                                         tagged-sentence-list)]
-    (set (mapv #(clojure.string/trim (:ncstring %))
-               enhanced-annotation-list))))
+  (set (mapv #(clojure.string/trim (:ncstring %))
+             (:annotations (gen-annotations document)))))
 
 
