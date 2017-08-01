@@ -94,11 +94,12 @@
         (if (= cmd "quit")
           (do (.write *out* "bye!\n")
               (.flush *out*)
-              (swap! running? false) )
+              (swap! running? not) )    ; set running to false
           (do
             (.write *out* "malformed request, ignoring.\n")
             (.flush *out*)))
         )))
+  (swap! running? not) ; set running back to true
   (Object.))
   
 (defn init
