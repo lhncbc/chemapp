@@ -180,9 +180,93 @@ timing tests using the following commands:
  enchildada0: 3516.717708 msecs 28173.301469 msecs 1977.993199 msecs 2009.773325 msecs
  ner:         278.611298 msecs 130.748993 msecs 95.190651 msecs
 
+
+
+### mallet
+
+Load data info two-dimensional array of tokens
+
+    String [][] tokens;
+
+for unlabelled data:
+
+input:
+
+    Preclinical 
+    Assessment 
+    of 
+    Ketamine 
+    . 
+    BACKGROUND 
+    : 
+    Ketamine 
+    is 
+    used 
+    ...
+
+tokens:
+
+    tokens[0][0] "Preclinical"
+    tokens[1][0] "Assessment"
+    tokens[2][0] "of"
+    tokens[3][0] "Ketamine"
+    tokens[4][0] "."
+    tokens[5][0] "BACKGROUND"
+    tokens[6][0] ":"
+    tokens[7][0] "ketamine"
+    tokens[8][0] "is"
+    tokens[9][0] "used"
+    ...
+
+Java Code:
+
+    FeatureVector[] fvs = new FeatureVector[tokens.length];
+    nFeatures = tokens[l].length;
+    
+
+     ArrayList<Integer> featureIndices = new ArrayList<Integer>();
+     for (int f = 0; f < nFeatures; f++) {
+      	int featureIndex = features.lookupIndex(tokens[l][f]);
+       	// gdruck
+       	// If the data alphabet's growth is stopped, featureIndex
+       	// will be -1.  Ignore these features.
+       	if (featureIndex >= 0) {
+       		featureIndices.add(featureIndex);
+       	}
+       }
+       int[] featureIndicesArr = new int[featureIndices.size()];
+       for (int index = 0; index < featureIndices.size(); index++) {
+       	featureIndicesArr[index] = featureIndices.get(index);
+       }
+      	fvs[l] = featureInductionOption.value ? new AugmentableFeatureVector(features, featureIndicesArr, null, featureIndicesArr.length) : 
+       	new FeatureVector(features, featureIndicesArr);
+     }
+
+    ObjectInputStream s =
+           new ObjectInputStream(new FileInputStream(modelOption.value));
+         crf = (CRF) s.readObject();
+         s.close();
+       }
+
+### Output for MTI2
+
+Output should be pipe-separated.
+
+Output should contain:
+
+pmid 
+MeSH Id (Descriptor or SCR)
+MeshTerm (term from source MSH)
+UMLS Concept (if available)
+Span in text (start, len) or (start, end)
+
+
+
 ### Bugs
 
 ...
+
+
 
 ### Any Other Sections
 ### That You Think
