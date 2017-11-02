@@ -21,11 +21,26 @@
 
 (defn tokenize-sentences
   "expects list of sentence structures of form {:sentence <string> :span {:start <int> :end <int>}}
-  returns list of maps of form {:sentence <sentence> :tokenlist <tokenlist>} "
-  [sentence-list]
-  (map (fn [sentence]
-         (assoc sentence :tokenlist (mm-tokenization/tokenize (:sentence sentence) 2)))
-       sentence-list))
+  returns list of maps of form {:sentence <sentence> :tokenlist <tokenlist>} 
+
+     tokenize-style: style of tokenization 
+
+       0 : keep whitespace
+       2 : strip whitespace
+       3 : strip whitespace, don't break on dashes '-'
+       4 : strip whitespace, don't break on dashes '-' or parens
+       5 : strip whitespace, preserve IUPAC chemicals (aggressive)
+       6 : strip whitespace, preserve IUPAC chemicals, remove trailing commas. (aggressive)
+       7 : keep whitespace, don't break on dashes '-'
+       8 : keep whitespace, don't break on dashes '-' or parens
+       9 : keep whitespace, preserve IUPAC chemicals (aggressive)
+      10 : keep whitespace, preserve IUPAC chemicals, remove trailing commas. (aggressive)"
+  ([sentence-list]
+   (tokenize-sentences 2))
+  ([sentence-list tokenize-style]
+   (map (fn [sentence]
+          (assoc sentence :tokenlist (mm-tokenization/tokenize (:sentence sentence) tokenize-style)))
+        sentence-list)))
 
 (defn pos-tag-sentence-list 
   " Expects list of maps of form {:sentence <sentence> :tokenlist <tokenlist>} 
@@ -57,13 +72,37 @@
        :pos-tags-enhanced 
        (add-spans-to-sentence-pos-tags (:sentence sentence-smap) (:span sentence-smap) (:pos-tags sentence-smap)))))
 
-(defn enhance-sentence-list-pos-tags
-  [sentence-list]
-  (map add-spans-to-sentence-pos-tags sentence-list))
+(defn add-spans-and-classes-to-sentence-pos-tags-no-ws
+  "Spans and character classes to tokens with part-of-speech info.
+  Convert tokens to maps with keywords :part-of-speech :text
+  and :span.  If passing a sentence map structure (smap) then add
+  mapping :pos-tags-enhanced to hold token map. "
+  ([^String sentence-text sentence-span tagged-tokenlist]
+   (filter #(not= (:class %) "ws")
+           (map (fn [token]
+                  (let [^String token-text (nth token 0)
+                        sentence-start (:start sentence-span) 
+                        start (.indexOf sentence-text token-text) ;start within sentence
+                        end   (+ start (count token-text))]
+                    (hash-map :text token-text
+                              :part-of-speech (nth token 1)
+                              :class (mm-tokenization/classify-token token-text)
+                              :span {:start (+ sentence-start start)
+                                     :end   (+ sentence-start start (count token-text))})))
+                tagged-tokenlist)))
+  ([sentence-smap]
+     (assoc sentence-smap 
+       :pos-tags-enhanced 
+       (add-spans-and-classes-to-sentence-pos-tags-no-ws
+        (:sentence sentence-smap) (:span sentence-smap) (:pos-tags sentence-smap)))))
 
 (defn enhance-sentence-list-pos-tags
   [sentence-list]
   (map add-spans-to-sentence-pos-tags sentence-list))
+
+(defn enhance-sentence-list-pos-tags-spans-and-classes-no-ws
+  [sentence-list]
+  (map add-spans-and-classes-to-sentence-pos-tags-no-ws sentence-list))
 
 (defn gen-token-span-map-from-tokenlist 
   "build a map of token keyed by span in text."
@@ -117,7 +156,10 @@
 
 (defn find-term
   [term text]
-  (find-pattern-1 (format "\\b%s\\b" term) text))
+  (find-pattern-1 (format "\\b%s\\b" (-> term
+                                         (string/replace "(" "\\(")
+                                         (string/replace ")" "\\)")
+                                         (string/replace "+" "\\+"))) text))
 
 (defn make-abbrev-map
   [abbrev-list]
@@ -152,18 +194,20 @@
                   (if (contains? abbrev-map (:text annotation))
                     (if (= (string/lower-case (-> (abbrev-map (:text annotation)) :long-form :text))
                            (string/lower-case (:text annotation)))
-                      (do 
-                        (print (format "%s -> long form: %s:%s\n" (:text annotation)
-                                       (-> (abbrev-map (:text annotation)) :long-form :text)
-                                       (-> (abbrev-map (:text annotation)) :short-form :text)))
+                      (do
+                        (comment
+                          (print (format "%s : (%s -> %s)\n" (:text annotation)
+                                         (-> (abbrev-map (:text annotation)) :long-form :text)
+                                         (-> (abbrev-map (:text annotation)) :short-form :text))))
                         (cons annotation
                               (make-annotations text
                                                 annotation
                                                 (-> (abbrev-map (:text annotation)) :short-form :text))))
                       (do 
-                        (print (format "%s -> short form: %s:%s\n" (:text annotation)
-                                       (-> (abbrev-map (:text annotation)) :short-form :text)
-                                       (-> (abbrev-map (:text annotation)) :long-form :text)))
+                        (comment
+                          (print (format "%s -> short form: %s:%s\n" (:text annotation)
+                                         (-> (abbrev-map (:text annotation)) :short-form :text)
+                                         (-> (abbrev-map (:text annotation)) :long-form :text))))
                         (cons annotation
                               (make-annotations text
                                                 annotation
