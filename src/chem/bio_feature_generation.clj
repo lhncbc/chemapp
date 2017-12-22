@@ -220,14 +220,17 @@
   (assoc acc :accum [] :sequence (conj (:sequence acc) (:accum acc))))
 
 (defn is-b-element?
+  "Is token an B (beginning) element?"
   [[state event]]
   (= (nth (:output event) 0) \B))
 
 (defn is-i-element?
+    "Is token an I (intermediate) element?"
   [[state event]]
   (= (nth (:output event) 0) \I))
 
 (defn is-o-element?
+  "Is token an O (outside) element?"
   [[state event]]
   (= (nth (:output event) 0) \O))
 
