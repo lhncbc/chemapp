@@ -27,6 +27,8 @@
                  [clj-http "2.3.0" :exclusions [commons-logging
                                                 org.clojure/tools.reader
                                                 com.fasterxml.jackson.core/jackson-core]]
+                 [clj-sockets "0.1.0"]
+                 [com.gearswithingears/async-sockets "0.1.0"]
                  [ring/ring-headers "0.3.0"]
                  [ring/ring-servlet "1.6.1"]
                  [ring/ring-jetty-adapter "1.6.1"]
@@ -46,11 +48,12 @@
                  [lexicalsystems/lex-access "2012"]
                  [javax.servlet/servlet-api "2.5"]
                  [clj-diff "1.0.0-SNAPSHOT"]
-                 [irutils "2.0"]]
+                 [irutils "2.0"]
+                 [reduce-fsm "0.1.4"]]
   :plugins [[lein-ring "0.12.0" :exclusions [org.clojure/clojure]]]
-  :repositories [["java.net" "http://download.java.net/maven/2"]
-                 ["ucc-repo" "http://maven.ch.cam.ac.uk/m2repo"]
-                 ["ii-repo" "http://indlx1.nlm.nih.gov:8000/maven2"]]
+  :repositories [;; ["java.net" "http://download.java.net/maven/2"]
+                 ;; ["ucc-repo" "http://maven.ch.cam.ac.uk/m2repo"]
+                 ["ii-repo" "https://metamap.nlm.nih.gov/maven2"]]
   :ring {:init chem.backend/init
          :handler chem.appserver/app}
   :profiles {:dev
