@@ -1,11 +1,13 @@
 (ns chem.irutils-normchem
-  (:import (irutils InvertedFileContainer))
+  (:import (java.lang Character)
+           (irutils InvertedFileContainer))
   (:require [clojure.string :as string :refer [join split lower-case]]
             [opennlp.nlp :as nlp]
             [chem.irutils :as irutils]
             [skr.tokenization :as mm-tokenization]
             [chem.span-utils :as span-utils]
             [chem.stopwords :as stopwords]
+            [chem.english-words :as englishwords]
             [skr.mwi-utilities :as mwi-utilities]
             [chem.annotation-utils :as annotation-utils]
             [chem.extract-abbrev :as extract-abbrev]
@@ -44,20 +46,35 @@
 (defonce indexname "normchem2017")
 (def ^:dynamic *normchem-index* (irutils/create-index tablepath indexpath indexname))
 
+(def term-id-exclusions
+  "Terms that should be ignored/removed if specified for a particular id"
+  {"ar"  "D001128",   ; Argon D001128 (not AR)
+   "glu" "C514131",   ; methacryloylamidoglutamic acid
+   "lead" "D007854", ; Lead (metal) D007854 (on lead [as in leading or leader])
+   "doi" "C015952"   ; 4-iodo-2,5-dimethoxyphenylisopropylamine (but DOI means document online identifier)
+   "com" "D015080"
+   })
+
+(defn in-excluded-map
+  [el]
+  (= (term-id-exclusions (lower-case (:text el))) (:meshid el)))
+
 (defn lookup
   "Return list of terms that approximately match normalized form of
   input term."
   [term]
   (let [lcterm (lower-case term)]
-    (if (and (or (Character/isLetter (first term))
-                 (Character/isDigit (first term)))
+    (if (and (or (Character/isLetter (.charValue (first term)))
+                 (Character/isDigit (.charValue (first term))))
              (> (count term) 2)
-             (not (contains? stopwords/stopwords lcterm)))
+             (not (or (contains? stopwords/stopwords lcterm)
+                      (englishwords/is-real-word? lcterm))))
       (set
-        (map #(assoc % :text term)
-             (concat
-              (irutils/lookup *normchem-index* lcterm )
-              (irutils/lookup *normchem-index* (convert-greek-chars lcterm)))))
+       (filter #(not (in-excluded-map %))
+               (map #(assoc % :text term)
+                    (concat
+                     (irutils/lookup *normchem-index* lcterm )
+                     (irutils/lookup *normchem-index* (convert-greek-chars lcterm))))))
       {})))
 
 (def ^:dynamic *memoized-lookup* (memoize lookup))
@@ -70,11 +87,22 @@
 
 (defn add-spans-to-entitylist
   "Add span of tokenlist to each entity"
-  [entitylist tokenlist]
-  (map (fn [entity]
-         (assoc entity :span {:start (-> tokenlist first :span :start)
-                              :end (-> tokenlist last :span :end)}))
-       entitylist))
+  ([entitylist tokenlist]
+   (map (fn [entity]
+          (assoc entity
+                 :span {:start (-> tokenlist first :span :start)
+                        :end (-> tokenlist last :span :end)}
+                 :text (join " " (mapv #(:text %) tokenlist))))
+        entitylist))
+  ([entitylist tokenlist text]
+   (map (fn [entity]
+          (assoc entity
+                 :span {:start (-> tokenlist first :span :start)
+                        :end (-> tokenlist last :span :end)}
+                 :text (subs text
+                             (-> tokenlist first :span :start)
+                             (-> tokenlist last :span :end))))
+        entitylist)))
 
 (defn list-combinations
   "Generate all possible sublist combinations of supplied list."
@@ -85,36 +113,67 @@
                 (list-head-proper-sublists subitemlist)))
         (list-tail-proper-sublists itemlist)))
 
+(defn hybrid-lookup
+  [tokenlist]
+  (let [term0 (join "" (mapv #(:text %) tokenlist))]
+    (concat 
+     (lookup (join " " (mapv #(:text %) tokenlist)))
+     (if (empty? term0) term0 (lookup term0)))))
+
+(defn basic-lookup
+  [tokenlist]
+  (lookup (join " " (mapv #(:text %) tokenlist))))
+
 (defn find-longest-matches
   "Return the longest spanning entities in supplied token lists
   removing any entities that are subsumed by a longer matching entity."
-  [mapped-tokenlist]
-  (filter #(not (empty? %))
-          (annotation-utils/remove-subsumed-annotations
-           (mapcat (fn [list-of-tokenlists]
-                     (mapcat (fn [tokenlist]
-                               (add-spans-to-entitylist
-                                (lookup (join " " (mapv #(:text %) tokenlist)))
-                                tokenlist))
-                             list-of-tokenlists))
-                   (list-combinations mapped-tokenlist)))))
+  ([mapped-tokenlist]
+   (filter #(not (empty? %))
+           (annotation-utils/remove-subsumed-annotations
+            (mapcat (fn [list-of-tokenlists]
+                      (mapcat (fn [[entitylist tokenlist]]
+                                (add-spans-to-entitylist entitylist tokenlist))
+                              (map (fn [tokenlist]
+                                     (vector (basic-lookup tokenlist)
+                                             tokenlist))
+                                   list-of-tokenlists)))
+                    (list-combinations mapped-tokenlist)))))
+  ([mapped-tokenlist text]
+   (filter #(not (empty? %))
+           (annotation-utils/remove-subsumed-annotations
+            (mapcat (fn [list-of-tokenlists]
+                      (mapcat (fn [[entitylist tokenlist]]
+                                (add-spans-to-entitylist entitylist tokenlist text))
+                              (map (fn [tokenlist]
+                                     (vector (basic-lookup tokenlist)
+                                             tokenlist))
+                                   list-of-tokenlists)))
+                    (list-combinations mapped-tokenlist))))))
 
 (defn find-matches-in-tagged-sentence
+  ([tagged-sentence]
+   (sort-by #(-> % :span :start)
+            (set (find-longest-matches (:pos-tags-enhanced tagged-sentence)))))
+  ([tagged-sentence text]
+   (sort-by #(-> % :span :start)
+            (set (find-longest-matches (:pos-tags-enhanced tagged-sentence) text)))))
+
+(defn check-terms
   [tagged-sentence]
-  (sort-by #(-> % :span :start)
-           (set (find-longest-matches (:pos-tags-enhanced tagged-sentence)))))
+  tagged-sentence)
 
 (defn gen-annotations
   "Process document, returning spans, abbreviations, and MeSH ids."
   [document]
   (let [tagged-sentence-list (-> document
                                  sentences/make-sentence-list
-                                 (sentences/tokenize-sentences 9)
+                                 (sentences/tokenize-sentences 8)
                                  sentences/pos-tag-sentence-list
                                  sentences/enhance-sentence-list-pos-tags-spans-and-classes-no-ws)
         abbrev-list (extract-abbrev/extract-abbr-pairs-string document)]
     (mapcat (fn [tagged-sentence]
-              (let [annotation-list (find-matches-in-tagged-sentence tagged-sentence)]
+              (let [annotation-list (check-terms
+                                     (find-matches-in-tagged-sentence tagged-sentence document))]
                 (sentences/add-valid-abbreviation-annotations document
                                                               annotation-list
                                                               abbrev-list)))
