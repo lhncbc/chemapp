@@ -75,6 +75,8 @@
               :label "Normalized Chemical Match (Lucene) plus Partial Chemical Match plus Mallet NER"}
    :combine5 {:func combinelib/combination-5
               :label "Normalized Chemical Match (IRUtils) plus Mallet NER"}
+   :combine6 {:func combinelib/combination-6
+              :label "Normalized Chemical Match (IRUtils) plus Mallet NER (entityrec)"}
    :mallet   {:func mallet-ner/process-document
               :label "Mallet NER"}
    ))
@@ -89,7 +91,7 @@
 
 (defn process
   "Generate annotations from document text."
-  [engine document]
+  [^String engine ^String document]
   (when (contains? *engine-map* (keyword engine))
     ((-> engine keyword *engine-map* :func) document)))
 
@@ -135,12 +137,12 @@
 ;;
 
 (defn annotate-chemdner-document
-  ([annotate-fn document]
-     (hash-map :title-result    (annotate-fn  (:title document))
-               :abstract-result (annotate-fn  (:abstract document))))
-  ([annotate-fn engine document]
-     (hash-map (keyword engine)
-               (annotate-chemdner-document annotate-fn document))))
+  ([annotate-func document]
+   (hash-map :title-result    (if (contains? document :title) (annotate-func  (:title document)) #{})
+             :abstract-result (if (contains? document :abstract) (annotate-func  (:abstract document)) #{})))
+  ([annotate-func engine document]
+     (hash-map engine
+               (annotate-chemdner-document annotate-func document))))
 
 (defn add-chemdner-gold-annotations [gold-doc-term-map document]
   ^{:doc "Add chemdner gold standard annotation for document using document's docid."}
@@ -434,78 +436,85 @@
 (defn process-chemdner-document-original
   [engine document]
   (conj document 
-        (hash-map (keyword engine)
+        (hash-map engine
                   (case engine
-                    "metamap" (let [mmapi-inst (mm-api/api-instantiate)]
+                    :metamap (let [mmapi-inst (mm-api/api-instantiate)]
                                 (hash-map :title-result    (mm-annot/annotate-document mmapi-inst (:title document))
                                           :abstract-result (mm-annot/annotate-document mmapi-inst (:abstract document))))
-                    "token" (annotate-chemdner-document mm-tokenization/gen-token-annotations engine document)
-                    "token-enhanced" (let [mmapi-inst (mm-api/api-instantiate)]
+                    :token (annotate-chemdner-document mm-tokenization/gen-token-annotations engine document)
+                    :token-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
                                        (annotate-chemdner-document 
                                         (fn [a-document]
                                           (mm-annot/get-enhanced-annotations
                                            mmapi-inst 
                                            (:annotations (mm-tokenization/gen-token-annotations a-document))))
                                         document))
-                    "partial"  (annotate-chemdner-document partial/match document)
-                    "partial-enhanced" (let [mmapi-inst (mm-api/api-instantiate)]
+                    :partial  (annotate-chemdner-document partial/match document)
+                    :partial-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
                                          (hash-map :title-result    (partial-enhanced/match mmapi-inst (:title document))
                                                    :abstract-result (partial-enhanced/match mmapi-inst (:abstract document))))
-                    "partial-token-enhanced" (let [mmapi-inst (mm-api/api-instantiate)]
+                    :partial-token-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
                                                (hash-map :title-result    (partial-enhanced/match2 mmapi-inst (:title document))
                                                          :abstract-result (partial-enhanced/match2 mmapi-inst (:abstract document))))
-                    "partial-token-filtered" (let [mmapi-inst (mm-api/api-instantiate)]
+                    :partial-token-filtered (let [mmapi-inst (mm-api/api-instantiate)]
                                                (hash-map :title-result    (partial-enhanced/filter-match2 mmapi-inst (:title document))
                                                          :abstract-result (partial-enhanced/filter-match2 mmapi-inst (:abstract document))))
-                    "fragment" (annotate-chemdner-document partial/fragment-match document)
-                    "normchem" (annotate-chemdner-document lucene-normchem/process-document document)
-                    "irutils-normchem" (annotate-chemdner-document irutils-normchem/process-document document)
-                    "combine1" (annotate-chemdner-document combinelib/combination-1 document)))))
+                    :fragment (annotate-chemdner-document partial/fragment-match document)
+                    :normchem (annotate-chemdner-document lucene-normchem/process-document document)
+                    :irutils-normchem (annotate-chemdner-document irutils-normchem/process-document document)
+                    :combine1 (annotate-chemdner-document combinelib/combination-1 document)
+                    :combine5 (annotate-chemdner-document combinelib/combination-5 document)
+                    :combine6 (annotate-chemdner-document combinelib/combination-6 document)
+))))
 
-(defn process-chemdner-document-seq [engine document-seq]
+(defn process-chemdner-document-seq
   "Generate annotations from structured document sequence text.
      Document elements contain fields mapped by the keywords :docid, :title, :abstract."
+   [engine document-seq]
   (case engine
-    "metamap" (let [mmapi-inst (mm-api/api-instantiate)]
+    :metamap (let [mmapi-inst (mm-api/api-instantiate)]
                 (map (fn [document]
                        (conj document
                              (hash-map (keyword engine)
                                        (hash-map :title-result    (mm-annot/annotate-document mmapi-inst (:title document))
                                                  :abstract-result (mm-annot/annotate-document mmapi-inst (:abstract document))))))
                      document-seq))
-    "token" (map #(annotate-chemdner-document mm-tokenization/gen-token-annotations engine %) document-seq)
-    "token-enhanced" (let [mmapi-inst (mm-api/api-instantiate)]
+    :token (map #(annotate-chemdner-document mm-tokenization/gen-token-annotations engine %) document-seq)
+    :token-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
                        (map #(conj % (annotate-chemdner-document 
                                              (fn [document]
                                                (mm-annot/get-enhanced-annotations
                                                 mmapi-inst 
                                                 (:annotations (mm-tokenization/gen-token-annotations document))))
                                              engine %)) document-seq))
-    "partial"  (map #(conj % (annotate-chemdner-document partial/match engine %)) document-seq)
-    "partial-enhanced" (let [mmapi-inst (mm-api/api-instantiate)]
+    :partial  (map #(conj % (annotate-chemdner-document partial/match engine %)) document-seq)
+    :partial-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
                          (map (fn [document]
                                 (conj document
                                       (hash-map :title-result    (partial-enhanced/match mmapi-inst (:title document))
                                                 :abstract-result (partial-enhanced/match mmapi-inst (:abstract document))
                                                 :method          engine)))
                               document-seq))
-    "partial-token-enhanced" (let [mmapi-inst (mm-api/api-instantiate)]
+    :partial-token-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
                                (map (fn [document]
                                       (conj document
                                             (hash-map :title-result    (partial-enhanced/match2 mmapi-inst (:title document))
                                                       :abstract-result (partial-enhanced/match2 mmapi-inst (:abstract document))
                                                       :method          engine)))
                                     document-seq))
-    "partial-token-filtered" (let [mmapi-inst (mm-api/api-instantiate)]
+    :partial-token-filtered (let [mmapi-inst (mm-api/api-instantiate)]
                                (map (fn [document]
                                       (conj document 
                                             (hash-map (keyword engine)
                                                       (hash-map :title-result    (partial-enhanced/filter-match2 mmapi-inst (:title document))
                                                                 :abstract-result (partial-enhanced/filter-match2 mmapi-inst (:abstract document))))))
                                     document-seq))
-    "fragment" (map #(conj % (annotate-chemdner-document partial/fragment-match engine %)) document-seq)
-    "normchem" (doall (map #(conj % (annotate-chemdner-document lucene-normchem/process-document engine %)) document-seq))
-    "combine1" (doall (map #(conj % (annotate-chemdner-document combinelib/combination-1 engine %)) document-seq))))
+    :fragment (map #(conj % (annotate-chemdner-document partial/fragment-match engine %)) document-seq)
+    :normchem (doall (map #(conj % (annotate-chemdner-document lucene-normchem/process-document engine %)) document-seq))
+    :combine1 (doall (map #(conj % (annotate-chemdner-document combinelib/combination-1 engine %)) document-seq))
+    :combine5 (doall (map #(conj % (annotate-chemdner-document combinelib/combination-5 engine %)) document-seq))
+    :combine6 (doall (map #(conj % (annotate-chemdner-document combinelib/combination-6 engine %)) document-seq))
+))
 
 
 ;; (def partial-token-filtered-result (process-chemdner-document-seq "partial-token-filtered" training-records))
@@ -529,6 +538,8 @@
                       (annotate-chemdner-document combinelib/combination-3 engine document))}
    :combine5 {:func (fn [document engine]
                       (annotate-chemdner-document combinelib/combination-5 engine document))}
+   :combine6 {:func (fn [document engine]
+                      (annotate-chemdner-document combinelib/combination-6 engine document))}
 })
 
 (defn process-chemdner-document
@@ -540,7 +551,9 @@
   {:irutils-normchem {:func (fn [document engine]
                               (annotate-chemdner-document irutils-normchem/index-document engine document))}
    :combine5 {:func (fn [document engine]
-                      (annotate-chemdner-document combinelib/index-combination-5 engine document))}
+                      (annotate-chemdner-document combinelib/combination-5 engine document))}
+   :combine6 {:func (fn [document engine]
+                      (annotate-chemdner-document combinelib/combination-6 engine document))}
    })
 
 (defn index-chemdner-document
@@ -553,6 +566,23 @@
                            :title-result)
                       (->> (get result (keyword engine))
                            :abstract-result)))))
+
+(def ^:dynamic *index-engine-map*
+  {:irutils-normchem {:func (fn [document engine]
+                              (annotate-chemdner-document irutils-normchem/index-document engine document))}
+   :combine5 {:func (fn [document engine]
+                      (annotate-chemdner-document combinelib/index-combination-5 engine document))}
+   :combine6 {:func (fn [document engine]
+                      (annotate-chemdner-document combinelib/index-combination-6 engine document))}
+   })
+
+(defn index-document
+   [engine document]
+  (let [result (when (contains? *index-engine-map* (keyword engine))
+                 ((-> engine keyword *index-engine-map* :func) document engine))]
+    (hash-map :docid (:docid document)
+              :terms (union (-> result (get "combine5") :abstract-result)
+                            (-> result (get "combine5") :title-result)))))
 
 (defn write-cdi-results
   "Write result list to file in CDI (Chemdner Document indexing) format."
