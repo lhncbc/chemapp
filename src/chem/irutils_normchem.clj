@@ -2,7 +2,9 @@
   (:import (java.lang Character)
            (irutils InvertedFileContainer))
   (:require [clojure.string :as string :refer [join split lower-case]]
+            [clojure.set :refer [union intersection]]
             [opennlp.nlp :as nlp]
+            [chem.opennlp]
             [chem.irutils :as irutils]
             [skr.tokenization :as mm-tokenization]
             [chem.span-utils :as span-utils]
@@ -14,7 +16,9 @@
             [chem.sentences :as sentences]
             [chem.greek-convert :refer [convert-greek-chars]]
             [entityrec.string-utils :refer [list-head-proper-sublists
-                                            list-tail-proper-sublists]])
+                                            list-tail-proper-sublists]]
+            [entityrec.find-longest-match :as eflm]
+            )
   (:gen-class))
 
 ;; How did we load this?
@@ -62,20 +66,22 @@
 (defn lookup
   "Return list of terms that approximately match normalized form of
   input term."
-  [term]
-  (let [lcterm (lower-case term)]
-    (if (and (or (Character/isLetter (.charValue (first term)))
-                 (Character/isDigit (.charValue (first term))))
-             (> (count term) 2)
-             (not (or (contains? stopwords/stopwords lcterm)
-                      (englishwords/is-real-word? lcterm))))
-      (set
-       (filter #(not (in-excluded-map %))
-               (map #(assoc % :text term)
-                    (concat
-                     (irutils/lookup *normchem-index* lcterm )
-                     (irutils/lookup *normchem-index* (convert-greek-chars lcterm))))))
-      {})))
+  ([term]
+   (let [lcterm (lower-case term)]
+     (if (and (or (Character/isLetter (.charValue (first term)))
+                  (Character/isDigit (.charValue (first term))))
+              (> (count term) 2)
+              (not (or (contains? stopwords/stopwords lcterm)
+                       (englishwords/is-real-word? lcterm))))
+       (set
+        (filter #(not (in-excluded-map %))
+                (map #(assoc % :text term)
+                     (concat
+                      (irutils/lookup *normchem-index* lcterm )
+                      (irutils/lookup *normchem-index* (convert-greek-chars lcterm))))))
+       {})))
+  ([term tokenlist]
+   (lookup term)))
 
 (def ^:dynamic *memoized-lookup* (memoize lookup))
 
@@ -156,11 +162,32 @@
             (set (find-longest-matches (:pos-tags-enhanced tagged-sentence)))))
   ([tagged-sentence text]
    (sort-by #(-> % :span :start)
-            (set (find-longest-matches (:pos-tags-enhanced tagged-sentence) text)))))
+            (set (find-longest-matches (:pos-tags-enhanced tagged-sentence) text))))
+  ([tagged-sentence text abbrev-list]
+   (sort-by #(-> % :span :start)
+            (union
+             (set (find-longest-matches (:pos-tags-enhanced tagged-sentence) text))
+             (set (mapcat (fn [abbrev]
+                            (if (contains? abbrev :mesh-set)
+                              (map #(assoc % :span (-> abbrev :short-form :span))
+                                   (:mesh-set abbrev))
+                              '()))
+                          abbrev-list)))
+            )))
 
 (defn check-terms
   [tagged-sentence]
   tagged-sentence)
+
+(defn lookup-abbreviations
+  "add any concepts that match abbreviations"
+  [abbrev-list]
+  (mapv (fn [abbrev]
+          (let [mesh-set (-> abbrev :long-form :text lookup)]
+            (if (empty? mesh-set)
+              abbrev
+              (assoc abbrev :mesh-set mesh-set))))
+        abbrev-list))
 
 (defn gen-annotations
   "Process document, returning spans, abbreviations, and MeSH ids."
@@ -170,10 +197,11 @@
                                  (sentences/tokenize-sentences 8)
                                  sentences/pos-tag-sentence-list
                                  sentences/enhance-sentence-list-pos-tags-spans-and-classes-no-ws)
-        abbrev-list (extract-abbrev/extract-abbr-pairs-string document)]
+        abbrev-list (lookup-abbreviations (extract-abbrev/extract-abbr-pairs-string document))]
     (mapcat (fn [tagged-sentence]
-              (let [annotation-list (check-terms
-                                     (find-matches-in-tagged-sentence tagged-sentence document))]
+              (let [annotation-list (find-matches-in-tagged-sentence tagged-sentence document
+                                                                     (filter #(contains? % :mesh-set)
+                                                                             abbrev-list))]
                 (sentences/add-valid-abbreviation-annotations document
                                                               annotation-list
                                                               abbrev-list)))
@@ -188,7 +216,7 @@
 
 (defn process-document-explore
   [document]
-  (let [tokenlist (mm-tokenization/analyze-text-chemicals-aggressive document)
+  (let [tokenlist (mm-tokenization/analyze-text-chemicals document)
         abbrev-list (extract-abbrev/extract-abbr-pairs-string document)
         annotation-list (find-longest-matches tokenlist)]
     (hash-map :spans (map #(:span %) annotation-list)
@@ -204,3 +232,18 @@
              (:annotations (gen-annotations document)))))
 
 
+(defn process-document-alt
+  "Process document, returning spans, abbreviations, and MeSH ids."
+  [document]
+  (let [result (mapcat (fn [sentence]
+                         (eflm/find-longest-match (mm-tokenization/analyze-text sentence) lookup))
+                       (chem.opennlp/get-sentences document))]
+    (hash-map
+     :spans (mapv #(:span %) result)
+     
+     :annotations (mapcat (fn [record]
+                          (mapv #(assoc % :span (:span record))
+                                (:entity-list record)))
+                          result)
+    )))
+  
