@@ -1,11 +1,12 @@
 (ns chem.extract-abbrev
-  (:import (bioc.tool ExtractAbbrev)))
+  (:import (bioc.tool AbbrInfo ExtractAbbrev))
+    (:gen-class))
 
 (defonce ^:dynamic *extract-abbrev-instance* (new ExtractAbbrev))
 
 (defn extract-abbr-pairs-string 
   [original-string]
-  (map (fn [abbr-info]
+  (map (fn [^AbbrInfo abbr-info]
          (let [short-form (.shortForm abbr-info)
                short-form-start (.shortFormIndex abbr-info)
                long-form (.longForm abbr-info)
