@@ -25,19 +25,20 @@
         engine    (nth fields 0)
         text      (nth fields 1)
         document  (read-text-body text)]
-    {:engine engine
-     :document document}))
+    (hash-map :engine engine
+               :document document)))
 
 (defn decode-simple
-  "convert message to map containing engine and document"
+  "Convert message to map containing engine and document.
+  If processing engine is not specified, default to engine
+  \"combine5\" (chem.combine-recognizers/combination-5) "
   [msg]
   (let [fields (string/split msg #"\|")
-        engine   (nth fields 0)
-        title    (if (> (count fields) 1) (nth fields 1) "")
+        engine   (if (= (count fields) 1) "combine5" (nth fields 0))
+        title    (if (> (count fields) 1) (nth fields 1) msg)
         abstract (if (> (count fields) 2) (nth fields 2) "")]
     {:engine engine
      :document (str title " " abstract)}))
-
 
 (defn consolidate-terms
   [resultmap]
@@ -53,22 +54,26 @@
 
 (defn piped-output
   [resultmap]
-  (let [idmap (reduce (fn [newmap annot]
-                        (if (not (empty? (:meshid annot)))
-                          (assoc newmap (string/lower-case (:text annot))
-                                 (:meshid annot))
-                          newmap))
-                      {} (:annotations resultmap))]
-    (apply str
-           (map (fn [[k v]]
-                  (string/join "|" (list k (idmap (string/lower-case k))
-                                         (string/join ";"
-                                                      (map #(format "%d,%d" 
-                                                                    (:start %)
-                                                                    (:end %))
-                                                           (:spans v)))
-                                         "\n")))
-                (consolidate-terms resultmap)))))
+  (if (empty? (:spans resultmap))
+    ""
+    (let [idmap (reduce (fn [newmap annot]
+                          (if (not (empty? (:meshid annot)))
+                            (assoc newmap (string/lower-case (:text annot))
+                                   (:meshid annot))
+                            newmap))
+                        {} (:annotations resultmap))]
+      (apply str
+             (map (fn [[k v]]
+                    (if (nil? k)
+                      ""
+                      (string/join "|" (list k (idmap (string/lower-case k))
+                                             (string/join ";"
+                                                          (map #(format "%d,%d" 
+                                                                        (:start %)
+                                                                        (:end %))
+                                                               (:spans v)))
+                                             "\n"))))
+                  (consolidate-terms resultmap))))))
 
 
 (defn handle-message
@@ -86,26 +91,26 @@
   []
   (while @running?
     (let [cmd (.readLine *in*)]
-      (if (string/index-of cmd "|")
-        (do 
-          (.write *out* (handle-message (decode-simple cmd)))
-          (.write *out* "EOF\n")
-          (.flush *out*))
-        (if (= cmd "quit")
-          (do (.write *out* "bye!\n")
+      (cond (or (= cmd "quit")
+                (= cmd "exit")
+                (= cmd "bye"))
+            (do
+              (.write *out* "bye!\n")
               (.flush *out*)
               (swap! running? not) )    ; set running to false
-          (do
-            (.write *out* "malformed request, ignoring.\n")
-            (.flush *out*)))
-        )))
+            :else
+            (do 
+              (.write *out* (handle-message (decode-simple cmd)))
+              (.write *out* "EOF\n")
+              (.flush *out*)))
+        ))
   (swap! running? not) ; set running back to true
   (Object.))
   
 (defn init
   "Supply server hostname as argument (port is optional), if no
   argument is supplied then server only accepts connections from
-  localhost/127.0.0.1. "
+  localhost/127.0.0.1 on port 32000. "
   ([]
    (backend/init)
    (start-server {:port 32000
