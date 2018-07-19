@@ -1,7 +1,8 @@
 (ns chem.pubchem
   (:import (java.net URLDecoder URLEncoder))
-  (:require [clojure.string :as string])
-  (:require [clj-http.client :as client]))
+  (:require [clojure.string :as string]
+            [clj-http.client :as client]
+            [clojure.data.json :as json]))
 
 ;; For more information on the PubChem User Gateway (PUG) ReST protocol see the following web pages:
 ;; PUG REST specification
@@ -25,8 +26,14 @@
      (format "http://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/%s/synonyms/%s"
              (URLEncoder/encode name) fmt)))
 
+(defn gen-synonym-cid-url 
+  ([cid] (gen-synonym-cid-url cid "JSON"))
+  ([cid fmt]
+     (format "http://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/%s/synonyms/%s"
+             (URLEncoder/encode cid) fmt)))
+
 (defn gen-compound-property-url 
-  ([cid]               
+  ([cid]
      (gen-compound-property-url cid "CanonicalSMILES" "JSON"))
   ([cid properties]    
      (gen-compound-property-url cid properties "JSON"))
@@ -34,15 +41,26 @@
      (format "http://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/%s/property/%s/%s" 
              cid (string/join properties) fmt)))
 
-
-(defn lookup [query]  
-  (client/get (gen-name-to-cidlist-url query "JSON")))
+(defn lookup [query]
+  (let [response (client/get (gen-name-to-cidlist-url query "JSON"))]
+    (if (= (:status response) 200)
+      (json/read-str (:body response))
+      {"Error" (:status response)})))
 
 (defn get-synonymlist [cid]
-  (client/get (gen-synonym-name-url cid "JSON")))
+  (try 
+    (let [response (client/get (gen-synonym-cid-url cid "JSON"))]
+        (json/read-str (:body response)))
+    (catch Exception e (str "Error: caught exception: " (.getMessage e)))))
 
 (defn get-isomeric-smiles [cid]
-  (client/get (gen-compound-property-url cid "IsomericSMILES" "JSON")))
+  (let [response (client/get (gen-compound-property-url cid "IsomericSMILES" "JSON"))]
+    (if (= (:status response) 200)
+      (json/read-str (:body response))
+      {"Error" (:status response)})))
 
 (defn get-canonical-smiles [cid]
-  (client/get (gen-compound-property-url cid "CanonicalSMILES" "JSON")))
+  (let [response (client/get (gen-compound-property-url cid "CanonicalSMILES" "JSON"))]
+    (if (= (:status response) 200)
+      (json/read-str (:body response))
+      {"Error" (:status response)})))
