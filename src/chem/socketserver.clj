@@ -1,8 +1,10 @@
 (ns chem.socketserver
   (:require [clojure.string :as string]
             [clojure.core.server :refer [start-server stop-server]]
+            [clojure.edn :as edn]
             [chem.backend :as backend]
             [chem.process :as process]
+            [chem.piped-output :refer [piped-output]]
             [medline.medline-format :as medline-format]
             [medline.medline-xml-format :as medline-xml-format])
   (:gen-class))
@@ -40,42 +42,6 @@
     {:engine engine
      :document (str title " " abstract)}))
 
-(defn consolidate-terms
-  [resultmap]
-  (reduce (fn [newmap annotation]
-            (let [key (:text annotation)]
-              (if (contains? newmap key)
-                (assoc newmap key (hash-map :meshid (:meshid annotation) 
-                                            :spans (conj (:spans (newmap key))
-                                                         (:span annotation))))
-                (assoc newmap key (hash-map :meshid (:meshid annotation)
-                                            :spans (vector (:span annotation)))))))
-          {} (:annotations resultmap)))
-
-(defn piped-output
-  [resultmap]
-  (if (empty? (:spans resultmap))
-    ""
-    (let [idmap (reduce (fn [newmap annot]
-                          (if (not (empty? (:meshid annot)))
-                            (assoc newmap (string/lower-case (:text annot))
-                                   (:meshid annot))
-                            newmap))
-                        {} (:annotations resultmap))]
-      (apply str
-             (map (fn [[k v]]
-                    (if (nil? k)
-                      ""
-                      (string/join "|" (list k (idmap (string/lower-case k))
-                                             (string/join ";"
-                                                          (map #(format "%d,%d" 
-                                                                        (:start %)
-                                                                        (:end %))
-                                                               (:spans v)))
-                                             "\n"))))
-                  (consolidate-terms resultmap))))))
-
-
 (defn handle-message
   "Given map containing :engine and :document elements, process
   supplied document using specified engine."
@@ -112,12 +78,14 @@
   argument is supplied then server only accepts connections from
   localhost/127.0.0.1 on port 32000. "
   ([]
+   (println (str "starting on 127.0.0.1:" 32000))
    (backend/init)
    (start-server {:port 32000
                   :name "dispatch"
                   :accept 'chem.socketserver/dispatch
                   :server-daemon false}))
   ([hostname]
+   (println (str "starting on " hostname ":" 32000))
    (backend/init)
    (start-server {:address hostname
                   :port 32000
@@ -125,9 +93,10 @@
                   :accept 'chem.socketserver/dispatch
                   :server-daemon false}))
   ([hostname port]
+   (println (str "starting on " hostname ":" port))
    (backend/init)
    (start-server {:address hostname
-                  :port port
+                  :port (edn/read-string port)
                   :name "dispatch"
                   :accept 'chem.socketserver/dispatch
                   :server-daemon false})))
