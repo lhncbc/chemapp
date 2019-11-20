@@ -5,8 +5,9 @@
 ;; socket server application
 
 (defn -main
-  "Start socket server using defaults"
+  "Start socket server using defaults, hostname, or hostname and port."
   [& args]
-  (if (empty? args)
-    (socketserver/init)
-    (socketserver/init (nth args 0))))
+  (println (str "args:" args))
+  (cond (empty? args) (socketserver/init)
+        (> (count args) 1) (socketserver/init (nth args 0) (nth args 1))
+        (> (count args) 0) (socketserver/init (nth args 0))))
