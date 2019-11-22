@@ -1,14 +1,14 @@
 (ns normchem-ivf
-  (:require [clojure.inspector :refer [inspect inspect-table inspect-tree]]
-            [clojure.pprint :refer [print-table pprint]]
-            [clojure.repl :refer :all]
-            [chem.irutils :refer [create-indexes lookup nmslookup] :as civf]))
+  (:require [chem.irutils :refer [create-index lookup nmslookup] :as civf]
+            [chem.irutils-normchem :as ir-normchem]))
 
+;;
+;; This module generates indices for Normalized chemical index in
+;; data/ivf/normchem/tables
+;;
 
-(def gwa "/net/lhcdevfiler/vol/cgsb5/ind/II_Group_WorkArea")
-(def gwah (str gwa "/wjrogers"))
-(def ivf (str gwah "/studio/clojure/chem/data/ivf"))
-(def tablepath (str ivf "/normchem2017/tables"))
-(def indexpath (str ivf "/normchem2017/indices"))
+(def ivf "data/ivf")
+(def tablepath (str ivf "/normchem/tables"))
+(def indexpath (str ivf "/normchem/indices"))
 (def indexname "normchem2017")
-(def norm-index (create-indexes tablepath indexpath indexname))
+(def normchem-index (create-index tablepath indexpath indexname))
