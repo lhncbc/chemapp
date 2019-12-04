@@ -18,7 +18,8 @@ mvn install:install-file -Dfile=public_mm/src/javaapi/dist/MetaMapApi.jar -Dgrou
 
 ## Usage
 
-FIXME: explanation
+The command line arguments the server are: [hostname [port]]
+The server defaults to localhost on port 32000 unless specified.
 
     $ java -jar chem-0.1.0-standalone.jar [args]
 
@@ -27,11 +28,6 @@ FIXME: explanation
 FIXME: listing of options this app accepts.
 
 ## Examples
-
-...
-
-## Running the socket server
-
 
 ### Example Request
 
