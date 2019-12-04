@@ -261,6 +261,21 @@ UMLS Concept (if available)
 Span in text (start, len) or (start, end)
 
 
+### Mallet features
+
+Each mallet feature contains the following elements separated by
+newlines.
+
+    part-of-speech character-class term
+
+Example:
+
+    "\nNN\nuc\nTEA\n"
+
+The part-of-speech in the feature should be normalized to noun, verb,
+etc. (i.e. remove make derivative parts of speech into normalized
+form, NN and NNP map to noun, for example.) or remove part-of-speech
+as a feature.
 
 ### Bugs
 
