@@ -4,17 +4,7 @@ Chemical Entity Recognition System
 
 ## Installation
 
-Download from http://example.com/FIXME.
-
-Get MetaMap API from http://metamap.nlm.nih.gov/
-
-Install public_mm/src/javaapi/dist/prologbeans.jar into Maven repository
-
-mvn install:install-file -Dfile=public_mm/src/javaapi/dist/prologbeans.jar -DgroupId=sics.se -DartifactId=prologbeans -Dversion=4.2.1 -Dpackaging=jar
-
-Install public_mm/src/javaapi/dist/MetaMapApi.jar into Maven repository
-
-mvn install:install-file -Dfile=public_mm/src/javaapi/dist/MetaMapApi.jar -DgroupId=gov.nih.nlm.nls.metamap -DartifactId=metamap-api -Dversion=2012 -Dpackaging=jar
+To be Documented
 
 ## Usage
 
@@ -89,30 +79,12 @@ To evaluate:
 
 bc-evaluate subsume-chemdner-resultlist.txt /nfsvol/nlsaux16/II\_Group\_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER\_TRAIN\_V01/cdi\_ann\_training_13-07-31.txt
 
-Adhoc MeSH Dictionary Lookup
-====================================
-
-Use chem/src/chem/mesh_chem.clj with MeSH Descriptors and
-Supplementary concept XML files to generate table file allmesh.txt.
-
-Use the program in $GWA/wjrogers/Projects/chem/pug/diy/mockup.py (Must think of better name...)
-See also, $GWA/wjrogers/Projects/chem/pug/diy/0README
-
-
-/nfsvol/nls/MEDLINE\_Baseline\_Repository/MeSH/2017
-
-  desc2017.xml
-  supp2017.xml
-
-See script $GWA/wjrogers/chem/scripts/mesh2017.clj to generate mesh_all.txt and mesh2017.termlist.
-
-Convert mesh_all.txt to meshtermlist that will be input to mockup.py
-
-
   
 ### Bugs
 
-...
+The NormChem dictionary using Lucene indexes is currently broken.  The
+IRUtils dictionary currently provides the same function so the Lucene
+version will probably be deprecated.
 
 ### Any Other Sections
 ### That You Think
