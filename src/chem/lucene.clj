@@ -1,4 +1,5 @@
 (ns chem.lucene
+  (:require [clojure.tools.logging :as log])
   (:import (org.apache.lucene.index DirectoryReader)
            (org.apache.lucene.store FSDirectory)
            (org.apache.lucene.document Document)
@@ -6,35 +7,36 @@
            (org.apache.lucene.search IndexSearcher Query ScoreDoc)
            (org.apache.lucene.queryparser.classic QueryParser)
            (org.apache.lucene.util Version)
-           (org.apache.lucene.analysis.en EnglishAnalyzer)))
+           (org.apache.lucene.analysis.en EnglishAnalyzer))
+  (:gen-class))
 
-;; (def ^:dynamic *nindex* (FSDirectory/open
-;;                          (File. "data/lucenedb/mwinormchem2015")))
-;; (def ^:dynamic *ireader* (DirectoryReader/open *nindex*))
-;; (def ^:dynamic *query-parser* (QueryParser. Version/LUCENE_CURRENT, "term", (EnglishAnalyzer.)))
-;; (def ^:dynamic *norm-query-parser* (QueryParser. Version/LUCENE_CURRENT, "nterm", (EnglishAnalyzer.)))
-;; (def ^:dynamic *isearcher* (IndexSearcher. *ireader*))
+(def nindex (atom nil)) 
+(def ireader (atom nil))
+(def query-parser (atom nil))
+(def norm-query-parser (atom nil))
+(def isearcher (atom nil))
 
 (defn init 
   ([] (init "data/lucenedb/mwinormchem2015"))
   ([^String dir-name]
-   (def ^:dynamic ^FSDirectory *nindex* (FSDirectory/open ^File (File. dir-name)))
-   (def ^:dynamic ^DirectoryReader *ireader* (DirectoryReader/open *nindex*))
-   (def ^:dynamic ^QueryParser *query-parser* (QueryParser. Version/LUCENE_CURRENT, "term", (EnglishAnalyzer.)))
-   (def ^:dynamic ^QueryParser *norm-query-parser* (QueryParser. Version/LUCENE_CURRENT,
-                                                                 "nterm",
-                                                                 ^EnglishAnalyzer (EnglishAnalyzer.)))
-   (def ^:dynamic ^IndexSearcher *isearcher* (IndexSearcher. *ireader*))  ))
+   (reset! ^FSDirectory nindex (FSDirectory/open ^File (File. dir-name)))
+   (reset! ^DirectoryReader ireader (DirectoryReader/open @nindex))
+   (reset! ^QueryParser query-parser (QueryParser. Version/LUCENE_CURRENT, "term", (EnglishAnalyzer.)))
+   (reset! ^QueryParser norm-query-parser (QueryParser. Version/LUCENE_CURRENT,
+                                                        "nterm",
+                                                        ^EnglishAnalyzer (EnglishAnalyzer.)))
+   (reset!^IndexSearcher isearcher (IndexSearcher. @ireader))  ))
 
 (defn lookup 
   "lookup term"
   ([term] (lookup term 100))
   ([^String term len]
-     (let [query (.parse *query-parser* term)
-           result (.search *isearcher* query nil len)
+     (let [query (.parse @query-parser term)
+           result (.search @isearcher query nil len)
            hit-list (.scoreDocs result)]
+       (log/info "hit-list: " (map bean hit-list))
        (map (fn [hit]
-              (let [hit-doc (.doc *isearcher* (.doc hit))]
+              (let [hit-doc (.doc @isearcher (.doc hit))]
                 (hash-map :text (.get hit-doc "term")
                           :cstring (.get hit-doc "term")
                           :meshid (.get hit-doc "meshid")
@@ -49,11 +51,11 @@
   "lookup term using normalized form of term"
   ([term] (lookup term 100))
   ([^String term len]
-     (let [query (.parse *norm-query-parser* term)
-           result (.search *isearcher* query nil len)
+     (let [query (.parse @norm-query-parser term)
+           result (.search @isearcher query nil len)
            hit-list (.scoreDocs result)]
        (map (fn [hit]
-              (let [hit-doc (.doc *isearcher* (.doc hit))]
+              (let [hit-doc (.doc @isearcher (.doc hit))]
                 (hash-map :text (.get hit-doc "term")
                           :cstring (.get hit-doc "term")
                           :meshid (.get hit-doc "meshid")

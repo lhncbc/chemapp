@@ -11,10 +11,14 @@
             [chem.token-partial :as token-partial]
             [chem.feature-generation :as fg]
             [skr.tokenization :as tokenization]
-            [chem.opennlp :refer [get-sentences tokenize pos-tag]])
+            [chem.opennlp :refer [get-sentences tokenize pos-tag]]
+            [chem.english-words :as englishwords])
   (:gen-class))
 
-(defonce ^:dynamic *crf-model-default-filename* "all.multi-label.seqtagcrf.model")
+(defonce ^:dynamic *crf-models-dir* "data/models/mallet")
+;;(def ^:dynamic *crf-model-default-filename* (str *crf-models-dir* "/all.multi-label.seqtagcrf.model"))
+(def ^:dynamic *crf-model-default-filename* (str *crf-models-dir* "/seqtagcrf-alt-lex.model"))
+;;(def ^:dynamic *crf-model-default-filename* (str *crf-models-dir* "/multiclass-seqtagcrf.model"))
 (defonce ^:dynamic *crf-model* nil)
 
 (defn set-crf-model! [crf-model]
@@ -40,7 +44,7 @@
   (let [sentence-tokenlist
         (fg/add-pos-tags
          (add-offset-to-spans
-          (tokenization/analyze-text-chemicals-aggressive (:text sentence-smap))
+          (tokenization/analyze-text-chemicals (:text sentence-smap))
           (:start sentence-smap)))]
     (map (fn [token]
            (conj token {:location (:location sentence-smap)}))
@@ -54,7 +58,7 @@
 (defn extract-document-features [document-text location]
   (map #(extract-sentence-features %)
         (map #(make-sentence-map document-text location %)
-             (get-sentences document-text))))
+             (@get-sentences document-text))))
 
 (defn tag-unlabelled-document-features
   "a sordid attempt at adding additional features to feature vector.
@@ -99,10 +103,28 @@
                             feature-tokenlist output)))
              document-tokenlists outputs)))
 
+(defn outputs-to-annotations-raw
+  "Convert Mallet outputs to annotations and filter out any
+   annotations that have bad endings."
+ [document-tokenlists outputs]
+ (apply concat
+        (map (fn [feature-tokenlist output]
+               (map #(assoc % :output (first %2) :mallet (second %2))
+                    feature-tokenlist output))
+             document-tokenlists outputs)))
+
 (defn filter-short-annotations [annotation-list]
   (filter (fn [annotation]
             (> (count (:text annotation)) 1))
           annotation-list))
+
+(defn annotate-text-raw
+  [document-text location]
+ (let [document-tokenlists(extract-document-features document-text location)
+        feature-tokenlists (tag-unlabelled-document-features document-tokenlists)
+        reader (new StringReader (assemble-sentences feature-tokenlists))
+        result (chem.mallet/test-reader *crf-model* reader)]
+      (outputs-to-annotations-raw document-tokenlists (:outputs result))))
 
 (defn annotate-text
   [document-text location]
@@ -120,8 +142,7 @@
         reader (new StringReader (assemble-sentences feature-tokenlists))
         result (chem.mallet/test-reader *crf-model* reader)]
     (filter-short-annotations
-     (annot-utils/consolidate-adjacent-annotations
-      (outputs-to-annotations document-tokenlists (:outputs result))))))
+      (outputs-to-annotations document-tokenlists (:outputs result)))))
 
 (defn annotate-record 
   "Annotate record"
@@ -156,9 +177,10 @@
                 (eval/get-annotation-termlist % :mallet-ner))
               annotated-record-list)))
 
-(defn gen-labels-with-probability [docid ner-table]
+(defn gen-labels-with-probability
   "Convert Stanford NER tables to Stacking format with labels
    containing term$docid$start$end and score."
+  [docid ner-table]
   (map (fn [row]
          (list docid (row :text) 1.0))
        ner-table))
@@ -168,18 +190,47 @@
   ([annotated-recordlist]
      (gen-mallet-ner-meta-data annotated-recordlist :mallet-ner))
   ([annotated-recordlist enginekywd]
-  (vec 
-   (apply concat
-          (vec 
-           (map (fn [record]
-                  (concat
-                   (gen-labels-with-probability (:docid record) (-> record enginekywd :title-result))
-                   (gen-labels-with-probability (:docid record) (-> record enginekywd :abstract-result))))
-                annotated-recordlist))))))
+   (vec 
+    (apply concat
+           (vec 
+            (map (fn [record]
+                   (concat
+                    (gen-labels-with-probability (:docid record) (-> record enginekywd :title-result))
+                    (gen-labels-with-probability (:docid record) (-> record enginekywd :abstract-result))))
+                 annotated-recordlist))))))
 
+(defn filter-english-words
+  "remove any annotations using english words."
+  [annotationlist]
+  (filterv (fn [annotation]
+            (let [term (:text annotation)]
+              (not (englishwords/is-real-word? term))))
+           annotationlist))
+
+
+(defn consolidate-BIO-annotations
+  "Consolidate multiple tokens adjacent to each other.  Irrelevant
+  tokens must be removed beforehand. "
+  [annotation-list]
+)
+
+(defn normalize-output-labels
+  [annotation-list]
+  (mapv (fn [annotation]
+          (if (:output annotation)
+            (if (= (subs (:output annotation) 0 2) "B-")
+              (assoc annotation :output (subs (:output annotation) 2))
+              annotation)
+            annotation))
+   annotation-list))
 
 (defn process-document
-  [document]
-  (let [annotations (vec (annotate-document document "A"))]
-    (hash-map :spans (map #(:span %) annotations)
-              :annotations annotations )))
+  "Annotate input document string instance."
+  ([^String document]
+   (process-document document "A"))
+  ([^String document field]
+   (let [annotations (filter #(not (nil? %))
+                             (normalize-output-labels (annot-utils/consolidate-adjacent-annotations
+                                                       (annotate-document document field))))]
+     (hash-map :spans (if (empty? annotations) [] (mapv #(:span %) annotations))
+               :annotations annotations ))))

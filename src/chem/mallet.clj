@@ -1,20 +1,17 @@
 (ns chem.mallet
-  (:use [clojure.pprint])
   (:require [clojure.string :as string]
-            [skr.tokenization :as tokenization])
-  (:use [chem.feature-generation :only (get-sentences)] )
-  (:import (java.io FileReader FileInputStream ObjectInputStream StringReader))
-  (:import (java.util List))
-  (:import (java.util.regex Pattern))
-  (:import (cc.mallet.fst SimpleTagger
-                          SimpleTagger$SimpleTaggerSentence2FeatureVectorSequence
-                          MaxLatticeDefault))
-  (:import (cc.mallet.pipe.iterator LineGroupIterator ArrayIterator
-                                    StringArrayIterator))
-  (:import (cc.mallet.types Instance InstanceList Sequence))
-  (:import (crfexample SimpleTaggerTest CRFTuple))
-  )
-
+            [skr.tokenization :as tokenization]
+            [chem.opennlp :refer [get-sentences]])
+  (:import [java.io FileReader FileInputStream ObjectInputStream StringReader]
+           (java.util List)
+           (java.util.regex Pattern)
+           (cc.mallet.fst SimpleTagger
+             SimpleTagger$SimpleTaggerSentence2FeatureVectorSequence
+             MaxLatticeDefault)
+           (cc.mallet.pipe.iterator LineGroupIterator ArrayIterator
+                                    StringArrayIterator)
+           (cc.mallet.types Instance InstanceList Sequence))
+  (:gen-class))
 
 (defonce ^:dynamic *cache-size* 10000)
 (defonce ^:dynamic *n-best* 1)
@@ -104,8 +101,8 @@
                                            (map #(conj % "\r")
                                                 (map #(tokenization/tokenize-no-ws %)
                                                      (concat
-                                                      (get-sentences (:title record))
-                                                      (get-sentences (:abstract record))))))))]
+                                                      (@get-sentences (:title record))
+                                                      (@get-sentences (:abstract record))))))))]
     (test-reader crfmodel rdr)))
 
 (defn test-tokenlist

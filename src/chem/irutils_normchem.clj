@@ -3,6 +3,7 @@
            (irutils InvertedFileContainer))
   (:require [clojure.string :as string :refer [join split lower-case]]
             [clojure.set :refer [union intersection]]
+            [clojure.tools.logging :as log]
             [opennlp.nlp :as nlp]
             [chem.opennlp]
             [chem.irutils :as irutils]
@@ -42,13 +43,22 @@
 ;; make sure irutils uses mmap for reading indexes
 (System/setProperty "ifread.mapped","true")
 
-(defonce gwa "/net/lhcdevfiler/vol/cgsb5/ind/II_Group_WorkArea")
-(defonce gwah (str gwa "/wjrogers"))
-(defonce ivfpath (str gwah "/studio/clojure/chem/data/ivf"))
-(defonce tablepath (str ivfpath "/normchem/tables"))
-(defonce indexpath (str ivfpath "/normchem/indices"))
-(defonce indexname "normchem2017")
-(def ^:dynamic *normchem-index* (irutils/create-index tablepath indexpath indexname))
+(def normchem-index (atom nil))
+
+(defn init
+  "Initialize index for normchem lookup."
+  [tablepath indexpath indexname]
+  (reset! normchem-index (irutils/create-index tablepath indexpath indexname)))
+
+;; Invoke chem.irutils-normchem/init before using
+(comment 
+  (defonce gwa "/net/lhcdevfiler/vol/cgsb5/ind/II_Group_WorkArea")
+  (defonce gwah (str gwa "/wjrogers"))
+  (defonce ivfpath (str gwah "/studio/clojure/chem/data/ivf"))
+  (defonce tablepath (str ivfpath "/normchem/tables"))
+  (defonce indexpath (str ivfpath "/normchem/indices"))
+  (defonce indexname "normchem2017")
+  (init tablepath indexpath indexname))
 
 (def term-id-exclusions
   "Terms that should be ignored/removed if specified for a particular id"
@@ -67,6 +77,7 @@
   "Return list of terms that approximately match normalized form of
   input term."
   ([term]
+   (log/debug "*normchem-index*: " @normchem-index)
    (let [lcterm (lower-case term)]
      (if (and (or (Character/isLetter (.charValue (first term)))
                   (Character/isDigit (.charValue (first term))))
@@ -77,8 +88,8 @@
         (filter #(not (in-excluded-map %))
                 (map #(assoc % :text term)
                      (concat
-                      (irutils/lookup *normchem-index* lcterm )
-                      (irutils/lookup *normchem-index* (convert-greek-chars lcterm))))))
+                      (irutils/lookup @normchem-index lcterm )
+                      (irutils/lookup @normchem-index (convert-greek-chars lcterm))))))
        {})))
   ([term tokenlist]
    (lookup term)))
@@ -232,6 +243,7 @@
              (:annotations (gen-annotations document)))))
 
 
+(comment
 (defn process-document-alt
   "Process document, returning spans, abbreviations, and MeSH ids."
   [document]
@@ -247,3 +259,4 @@
                           result)
     )))
   
+)

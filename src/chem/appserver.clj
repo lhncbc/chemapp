@@ -43,7 +43,7 @@
   (log/info (str "request keys: " (keys request)))
   (dorun 
    (map (fn [[key value]]
-            (.println System/out (format "(request %s) -> %s" key value)))
+            (log/info (format "(request %s) -> %s" key value)))
         request)))
 
 (defn wrap-nop
@@ -60,13 +60,13 @@
 
   (GET "/chemdner/" [] 
     (fn [req]
-      (println (str "/chemdner/ " (prn-str (:params req))))
+      (log/debug (str "/chemdner/ " (prn-str (:params req))))
       (cond (empty? (:params req)) (chemdner-page req)
             (contains? (:params req) "docid") (chemdner-document-page req (get (:params req) "docid")))))
 
   (GET "/altpubmed/" [] 
     (fn [req]
-      (println (str "/altpubmed/ " (prn-str (:params req))))
+      (log/debug (str "/altpubmed/ " (prn-str (:params req))))
       (cond (empty? (:params req)) (pubmed-page req)
             (contains? (:params req) "pmid")
             (pubmed-document-page req
@@ -77,12 +77,12 @@
 
   (GET "/pubmed/" [] (pubmed-entry-page))
   (GET "/pubmed/:pmid/" [pmid] 
-    (println (str "/pubmed/ " pmid))
+    (log/debug (str "/pubmed " pmid))
     (json-views/pubmed-output pmid))
 
   (GET "/pubmedjson/" [] (pubmed-entry-page))
   (GET "/pubmedjson/:pmid/" [pmid] 
-    (println (str "/pubmedjson/ " pmid))
+    (log/debug (str "/pubmedjson " pmid))
     (json-views/pubmed-output pmid))
 
   (GET "/pubmedjson/:pmid/:engine/" [pmid engine] 
@@ -91,20 +91,20 @@
   (GET "/pubmedcdi/:pmid/:engine/" [pmid engine] 
     (cdi-views/pubmed-output pmid engine))
 
-  (POST "/adhoc/json/" [document engine] 
-    (.println System/out (format "document: %s, engine: %s" document engine))
+  (POST "/adhoc/json/" [document engine]
+    (log/debug "document: " document ", engine:" engine)
     (json-views/adhoc-output document (if (nil? engine)
                                         "combine5"
                                         engine)))
 
   (POST "/adhoc/piped/" [document engine] 
-    (.println System/out (format "document: %s, engine: %s" document engine))
+    (log/debug "document: " document ", engine:" engine)
     (piped-views/adhoc-output document (if (nil? engine)
                                          "combine5"
                                          engine)))
 
   (POST "/adhoc/process/" [document engine]
-    (.println System/out (format "document: %s, engine: %s" document engine))
+    (log/debug "document: " document ", engine:" engine)
     (fn [req]
       (view-adhoc-output req document engine (process/process
                                               (if (nil? engine)
@@ -119,5 +119,5 @@
   (-> viewer-routes
       wrap-nested-params
       wrap-keyword-params
-      wrap-params 
+      wrap-params
       ))
