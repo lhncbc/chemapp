@@ -1,10 +1,21 @@
-# chemrecog
+# chemapp/chemrecog
 
-Chemical Entity Recognition System
+chemapp - Chemical Entity Recognition System
 
 ## Installation
 
-To be Documented
+### Standalone web app and Socket Server Setup
+
+The socket server and standalone web use the same directory
+organization.  The directories config and data must be in the
+top-level directory "chem" as chem/config and chem/data.
+
+### Deployment to Tomcat
+
+Both config and data must reside in chem/war-resources.  This can be
+done by symbolically linking the directories to the ones in
+chem/config and chem/data.  The "lein ring uberwar" will automatically
+copy the content of the directories to the deployment jar.
 
 ## Usage
 
@@ -16,6 +27,22 @@ The server defaults to localhost on port 32000 unless specified.
 ## Options
 
 FIXME: listing of options this app accepts.
+
+## External Data (Mostly indexes)
+
+The following files and directories data directory reside in the data
+directory.  When using the socket server the data directory resides in
+directory the server is executed from.  When using the servlet the
+data directory resides in the servlet engine directory (usually
+tomcat) or in some cases it must be deployed with the servlet and
+resides in the servlet deployment directory (for instance:
+webapps/chemapp.)
+
+    corncob_lowercase.txt  - a file 
+    ivf       - contains IRutils version of normchem database (2017)
+    lucenedb  - contains lucene version of normchem database (2015)
+    models    - OpenNLP models
+
 
 ## Examples
 

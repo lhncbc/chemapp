@@ -1,4 +1,4 @@
-(defproject chem "0.1.0-SNAPSHOT"
+(defproject chem "0.1.1-SNAPSHOT"
   :description "Chemical Term Detection"
   :url "https://ii.nlm.nih.gov/"
   :license {:name "Public Domain"
@@ -46,26 +46,28 @@
                  [gov.nih.nlm.nls.lexaccess/lexaccess-dist "2013"]
                  [javax.servlet/servlet-api "2.5"]
                  [clj-diff "1.0.0-SNAPSHOT"]
-                 [irutils "2.0-SNAPSHOT"]
+                 [irutils "2.0"]
                  [dosage-info "0.1.0-SNAPSHOT"]
                  [standoff "0.1.0-SNAPSHOT"]
                  [com.novemberain/monger "3.1.0"]
                  ;; [uncomplicate/neanderthal "0.24.0"]  ; be sure that The Intel Math Kernel Library is in LD_LIBRARY_PATH
                  [congomongo "1.1.0"]]
-  :plugins [[lein-ring "0.8.12" :exclusions [org.clojure/clojure]]
-            [lein-jupyter "0.1.16":exclusions [org.clojure/clojure
-                                               cider/cider-nrepl]]]
+  :plugins [[lein-ring "0.8.12" :exclusions [org.clojure/clojure]]]
   :repositories [["metamap" "https://metamap.nlm.nih.gov/maven2"]
                  ;; ["java.net" "https://download.java.net/maven/2"]
                  ;; ["ucc-repo" "https://maven.ch.cam.ac.uk/m2repo"]
                  ]
   :ring {:init chem.backend/init
-         :handler chem.appserver/app}
+         :handler chem.appserver/app
+         :web-xml "web.xml"}
   :profiles {:dev
              {:dependencies
               [[org.clojure/java.classpath "0.2.2"]]}}
   :marginalia {:javascript ["mathjax/MathJax.js"]}
   :uberjar {:aot :all}
-  :aot [chem.core]
+  :aot [chem.core
+        chem.backend
+        chem.applistener
+        chem.appservlet]
   :main chem.core)
 
