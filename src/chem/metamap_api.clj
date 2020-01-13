@@ -1,6 +1,18 @@
 (ns chem.metamap-api
   (:use [chem.utils])
-  (:import (gov.nih.nlm.nls.metamap MetaMapApiImpl PCM Phrase))
+  (:import (gov.nih.nlm.nls.metamap AcronymsAbbrevs
+                                    ConceptPair
+                                    Ev
+                                    MatchMap
+                                    MetaMapApi
+                                    MetaMapApiImpl
+                                    Mapping
+                                    Negation
+                                    PCM
+                                    Phrase
+                                    Position
+                                    Result
+                                    Utterance))
   (:gen-class))
 
 ;; really trival example of use:
@@ -29,11 +41,11 @@
           (print (str "mmserver hostname: " (deref #'*mmserver-hostname*)))
           (new MetaMapApiImpl (deref #'*mmserver-hostname*)))))
         (new MetaMapApiImpl))
-  ([hostname] (new MetaMapApiImpl hostname)))
+  ([^String hostname] (new MetaMapApiImpl hostname)))
 
 (defn process-string
-  ([mmapi text]  (.processCitationsFromString mmapi text))
-  ([mmapi text options]
+  ([^MetaMapApi mmapi ^String text]  (.processCitationsFromString mmapi text))
+  ([^MetaMapApi mmapi ^String text ^String options]
      (when options 
        (.setOptions mmapi options))
      (.processCitationsFromString mmapi text)))
@@ -46,7 +58,8 @@
 (defn gen-restrict-to-semtype-option [semtype-list]
   (format "--restrict_to_sts %s" (clojure.string/join "," semtype-list)))
 
-(defn handle-match-map [match-map] 
+(defn handle-match-map
+  [^MatchMap match-map] 
   (hash-map
    :concept-match-start (.getConceptMatchStart match-map)
    :concept-match-end (.getConceptMatchEnd match-map)
@@ -54,12 +67,14 @@
    :phrase-match-end (.getPhraseMatchEnd match-map)
    :lexical-variation (.getLexMatchVariation match-map) ))
 
-(defn handle-positional-info [position]
+(defn handle-positional-info
+  [^Position position]
   (hash-map
    :start (.getX position)
    :length (.getY position) ))
 
-(defn handle-ev [ev-inst]
+(defn handle-ev
+  [^Ev ev-inst]
   (hash-map
    :conceptid (.getConceptId ev-inst)
    :conceptname (.getConceptName ev-inst)
@@ -73,15 +88,19 @@
    :sources (vec (.getSources ev-inst))
    :matchmaplist (map handle-match-map (.getMatchMapList ev-inst))))
 
-(defn handle-utterance [utterance]
+(defn handle-utterance
+  "Get Phrases and 
+   Mappings Evaluation List (EvList)"
+  [^Utterance utterance]
   (doall
-  (map (fn [pcm]
-         (map (fn [mappings]
+  (map (fn [^PCM pcm]
+         (map (fn [^Mapping mappings]
                 (map handle-ev (.getEvList mappings)))
               (.getMappings pcm)))
        (.getPCMList utterance))))
 
-(defn handle-acronym-abbrev [acronym-abbrev]
+(defn handle-acronym-abbrev
+  [^AcronymsAbbrevs acronym-abbrev]
   (hash-map 
    :acronym (.getAcronym acronym-abbrev)
    :expansion (.getExpansion acronym-abbrev)
@@ -90,7 +109,7 @@
 
 (defn handle-result-list [result-list]
   (flatten
-   (map (fn [result]
+   (map (fn [^Result result]
           (list 
            (map handle-acronym-abbrev
                 (.getAcronymsAbbrevs result))

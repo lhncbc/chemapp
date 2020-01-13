@@ -1,5 +1,17 @@
 (ns chem.new-metamap-api
-  (:import (gov.nih.nlm.nls.metamap MetaMapApiImpl PCM Phrase))
+  (:import (gov.nih.nlm.nls.metamap AcronymsAbbrevs
+                                    ConceptPair
+                                    Ev
+                                    MatchMap
+                                    MetaMapApi
+                                    MetaMapApiImpl
+                                    Mapping
+                                    Negation
+                                    PCM
+                                    Phrase
+                                    Position
+                                    Result
+                                    Utterance))
   (:gen-class))
 
 ;; A incomplete Clojure wrapper around the MetaMap Java API.
@@ -32,19 +44,20 @@
           (print (str "mmserver hostname: " (deref #'*mmserver-hostname*)))
           (new MetaMapApiImpl (deref #'*mmserver-hostname*)))))
         (new MetaMapApiImpl))
-  ([hostname] (new MetaMapApiImpl hostname)))
+  ([^String hostname] (new MetaMapApiImpl hostname)))
 
 ;; One way to convert an UTF-8 string to ascii 
 ;;    String utf = "Some UTF-8 String";  
 ;;    byte[] data = utf.getBytes("ASCII");  
 ;;    String ascii = new String(data);  
 
-(defn utf8-to-ascii [text]
+(defn utf8-to-ascii
+  [^String text]
   (String. (.getBytes text "ASCII")))
 
 (defn process-string
-  ([mmapi text]  (.processCitationsFromString mmapi text))
-  ([mmapi text options]
+  ([^MetaMapApi mmapi ^String text]  (.processCitationsFromString mmapi text))
+  ([^MetaMapApi mmapi ^String text ^String options]
      (when options 
        (.setOptions mmapi options))
      (.processCitationsFromString mmapi text)))
@@ -57,7 +70,8 @@
 (defn gen-restrict-to-semtype-option [semtype-list]
   (format "--restrict_to_sts %s" (clojure.string/join "," semtype-list)))
 
-(defn handle-match-map [match-map] 
+(defn handle-match-map
+  [^MatchMap match-map] 
   (hash-map
    :concept-match-start (.getConceptMatchStart match-map)
    :concept-match-end (.getConceptMatchEnd match-map)
@@ -65,12 +79,14 @@
    :phrase-match-end (.getPhraseMatchEnd match-map)
    :lexical-variation (.getLexMatchVariation match-map) ))
 
-(defn handle-positional-info [position]
+(defn handle-positional-info
+  [^Position position]
   (hash-map
    :start (.getX position)
    :length (.getY position) ))
 
-(defn handle-ev [ev-inst]
+(defn handle-ev
+  [^Ev ev-inst]
   (hash-map
    :conceptid (.getConceptId ev-inst)
    :conceptname (.getConceptName ev-inst)
@@ -84,82 +100,62 @@
    :sources (vec (.getSources ev-inst))
    :matchmaplist (map handle-match-map (.getMatchMapList ev-inst))))
 
-(defn handle-utterance [utterance]
+(defn handle-utterance
   "Get Phrases and 
    Mappings Evaluation List (EvList)"
+   [^Utterance utterance]
   (doall
    (hash-map :id (.getId utterance)
              :utterance (.getString utterance)
              :position  (handle-positional-info (.getPosition utterance))
              :phrase-mappings-list
-             (map (fn [pcm]
+             (map (fn [^PCM pcm]
                     (hash-map :phrase (hash-map :phrase-text (.getPhraseText (.getPhrase pcm))
                                                 :mincoman (.getMincoManAsString (.getPhrase pcm))
                                                 :position (handle-positional-info (.getPosition (.getPhrase pcm))))
-                              :mappings (map (fn [mappings]
+                              :mappings (map (fn [^Mapping mappings]
                                                (hash-map :ev-list
                                                          (map handle-ev (.getEvList mappings))))
                                              (.getMappings pcm))))
                   (.getPCMList utterance)))))
 
-(defn handle-acronym-abbrev [acronym-abbrev]
+(defn handle-acronym-abbrev
+  [^AcronymsAbbrevs acronym-abbrev]
   (hash-map 
    :acronym (.getAcronym acronym-abbrev)
    :expansion (.getExpansion acronym-abbrev)
    :countlist (vec (.getCountList acronym-abbrev))
    :cuilist (vec (.getCUIList acronym-abbrev))))
 
-(defn handle-concept-pair [concept-pair] 
-  (hash-map :concept (.getConceptId concept-pair)
-            :preferred-name (.getPreferredName concept-pair)))
-
-(defn handle-negation [negation]
-  (hash-map :type                   (.getType negation)
-            :concept-pair-list      (vec (map handle-concept-pair (.getConceptPairList negation)))
-            :position-list          (vec (map handle-positional-info (.getConceptPositionList negation)))
-            :trigger                (.getTrigger negation)
-            :trigger-position-list  (vec (map handle-positional-info (.getTriggerPositionList negation)))
-            ))
-
 (defn handle-result-list [result-list]
-  (vec 
+  (flatten
    (map (fn [result]
-          (hash-map :acronym-abbrev-list 
-                    (vec (map handle-acronym-abbrev
-                         (.getAcronymsAbbrevs result)))
-                    :utterance-list
-                    (vec (map handle-utterance
-                         (.getUtteranceList result)))
-                    :negation-list (vec (map handle-negation
-                                        (.getNegationList result)))))
+          (map (fn [^Utterance utterance]
+                 (reduce (fn [newulist ^PCM pcm]
+                           (concat newulist 
+                                   (reduce (fn [newlist ^Mapping mappings]
+                                             (concat newlist 
+                                                     (map handle-ev (.getEvList mappings))))
+                                           [] (.getMappings pcm))))
+                         [] (.getPCMList utterance)))
+               (.getUtteranceList result)))
         result-list)))
 
-(defn handle-utterance-mappings [utterance]
-  "Get Mappings Evaluation List (EvList) from
-   Phrase/Candidate/Mappings (PCM) list; Phrases and Candidates are
-   discarded along with other components of the utterance."
-(flatten
-   (reduce (fn [newulist pcm]
-             (concat newulist 
-                     (reduce (fn [newlist mappings]
-                               (concat newlist 
-                                       (map handle-ev (.getEvList mappings))))
-                             [] (.getMappings pcm))))
-           [] (.getPCMList utterance))))
-
-(defn get-aa-and-mappings-only [result-list]
+(defn get-aa-and-mappings-only
   "return only acronyms and mappings"
+   [result-list]
   (vec
-   (map (fn [result]
+   (map (fn [^Result result]
           (hash-map :acronym-abbrev-list (map handle-acronym-abbrev
                                               (.getAcronymsAbbrevs result))
-                    :mappings-list (map handle-utterance-mappings
+                    :mappings-list (map handle-utterance
                                         (.getUtteranceList result))
 
                     ))
         result-list)))
 
-(defn get-ev-from-resultlist [result-list]
+(defn get-ev-from-resultlist
+  [result-list]
   (map (fn [result]
          (map (fn [utterance]
                 (map (fn [pcm] 
