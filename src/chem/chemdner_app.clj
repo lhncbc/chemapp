@@ -1,6 +1,8 @@
 (ns chem.chemdner-app
-  (:require [chem.chemdner-tools :as chemdner-tools]
+  (:require [chem.backend :as backend]
+            [chem.chemdner-tools :as chemdner-tools]
             [chem.pipeline :as pipeline]
+            [clojure.string :as string]
             [clojure.pprint :refer [pprint]])
   (:gen-class))
 
@@ -11,10 +13,11 @@
   [& args]
   (println "Chemical Annotator")
   (println (str "chemdner input files: " (string/join args)))
+  (backend/init)
   (pprint
    (map (fn [arg]
           (let [document-list (chemdner-tools/load-chemdner-abstracts arg)
-                annot-result-list (pipeline/annotate-document-set document-list "metamap")]
+                annot-result-list (pipeline/annotate-document-set document-list "combine5")]
             
             ))
         args)))
