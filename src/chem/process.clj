@@ -6,7 +6,6 @@
             [skr.tokenization :as mm-tokenization]
             [chem.semtypes :as semtypes]
             [chem.partial :as partial]
-            [chem.partial-enhanced :as partial-enhanced]
             [chem.irutils-normchem :as irutils-normchem]
             [chem.lucene-normchem :as lucene-normchem]
             [chem.combine-recognizers :as combinelib]
@@ -30,20 +29,6 @@
 
 ;; (defonce disabled-engines
 ;;  {
-   ;; :mongodb-normchem {:func (fn [document] (normchem/process-document document))
-   ;;            :label "Normalized Chemical Match (MongoDB)"}
-   ;; :partial-enhanced {:func (fn [document]
-   ;;                            (let [mmapi-inst (mm-api/api-instantiate)]
-   ;;                              (partial-enhanced/match mmapi-inst document)))
-   ;;                    :label "Partial Chemical Match Enhanced"}
-   ;; :partial-token-enhanced {:func (fn [document]
-   ;;                                  (let [mmapi-inst (mm-api/api-instantiate)]
-   ;;                                    (partial-enhanced/match2 mmapi-inst document)))
-   ;;                          :label "Partial Token Chemical Match Enhanced"}
-   ;; :partial-token-filtered {:func (fn [document]
-   ;;                                  (let [mmapi-inst (mm-api/api-instantiate)]
-   ;;                                    (partial-enhanced/filter-match2 mmapi-inst document)))
-   ;;                          :label "Partial Chemical Token Filtered"}
    ;; :token-enhanced {:func (fn [document]
    ;;                          (let [mmapi-inst (mm-api/api-instantiate)]
    ;;                            (mm-annot/get-enhanced-annotations
@@ -109,16 +94,6 @@
    ;;                   document-seq)))
    :partial  (fn [document-seq]
                (map partial/match     document-seq))
-   ;; :partial-enhanced (fn [document-seq]
-   ;;                     (let [mmapi-inst (mm-api/api-instantiate)]
-   ;;                       (map  (fn [document]
-   ;;                               (partial-enhanced/match mmapi-inst document))
-   ;;                             document-seq)))
-   ;; :partial-token-enhanced (fn [document-seq]
-   ;;                           (let [mmapi-inst (mm-api/api-instantiate)]
-   ;;                             (map  (fn [document]
-   ;;                                     (partial-enhanced/match2 mmapi-inst document))
-   ;;                                   document-seq)))
    :fragment (fn [document-seq] (map partial/fragment-match    document-seq))
    :lucene   (fn [document-seq] (map lucene-normchem/process-document document-seq))
    :irutils  (fn [document-seq] (map irutils-normchem/process-document document-seq))
@@ -450,15 +425,6 @@
                     ;;                        (:annotations (mm-tokenization/gen-token-annotations a-document))))
                     ;;                     document))
                     :partial  (annotate-chemdner-document partial/match document)
-                    ;; :partial-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
-                    ;;                      (hash-map :title-result    (partial-enhanced/match mmapi-inst (:title document))
-                    ;;                                :abstract-result (partial-enhanced/match mmapi-inst (:abstract document))))
-                    ;; :partial-token-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
-                    ;;                            (hash-map :title-result    (partial-enhanced/match2 mmapi-inst (:title document))
-                    ;;                                      :abstract-result (partial-enhanced/match2 mmapi-inst (:abstract document))))
-                    ;; :partial-token-filtered (let [mmapi-inst (mm-api/api-instantiate)]
-                    ;;                            (hash-map :title-result    (partial-enhanced/filter-match2 mmapi-inst (:title document))
-                                                         ;; :abstract-result (partial-enhanced/filter-match2 mmapi-inst (:abstract document))))
                     :fragment (annotate-chemdner-document partial/fragment-match document)
                     :normchem (annotate-chemdner-document lucene-normchem/process-document document)
                     :irutils-normchem (annotate-chemdner-document irutils-normchem/process-document document)
@@ -488,27 +454,6 @@
     ;;                                             (:annotations (mm-tokenization/gen-token-annotations document))))
     ;;                                          engine %)) document-seq))
     :partial  (map #(conj % (annotate-chemdner-document partial/match engine %)) document-seq)
-    ;; :partial-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
-    ;;                      (map (fn [document]
-    ;;                             (conj document
-    ;;                                   (hash-map :title-result    (partial-enhanced/match mmapi-inst (:title document))
-    ;;                                             :abstract-result (partial-enhanced/match mmapi-inst (:abstract document))
-    ;;                                             :method          engine)))
-    ;;                           document-seq))
-    ;; :partial-token-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
-    ;;                            (map (fn [document]
-    ;;                                   (conj document
-    ;;                                         (hash-map :title-result    (partial-enhanced/match2 mmapi-inst (:title document))
-    ;;                                                   :abstract-result (partial-enhanced/match2 mmapi-inst (:abstract document))
-    ;;                                                   :method          engine)))
-    ;;                                 document-seq))
-    ;; :partial-token-filtered (let [mmapi-inst (mm-api/api-instantiate)]
-    ;;                            (map (fn [document]
-    ;;                                   (conj document 
-    ;;                                         (hash-map (keyword engine)
-    ;;                                                   (hash-map :title-result    (partial-enhanced/filter-match2 mmapi-inst (:title document))
-    ;;                                                             :abstract-result (partial-enhanced/filter-match2 mmapi-inst (:abstract document))))))
-    ;;                                 document-seq))
     :fragment (map #(conj % (annotate-chemdner-document partial/fragment-match engine %)) document-seq)
     :normchem (doall (map #(conj % (annotate-chemdner-document lucene-normchem/process-document engine %)) document-seq))
     :combine1 (doall (map #(conj % (annotate-chemdner-document combinelib/combination-1 engine %)) document-seq))
