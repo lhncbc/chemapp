@@ -1,7 +1,8 @@
 (ns chem.evaluation
-  (:use [clojure.set])
-  (:require [clojure.string :as string])
-  (:require [chem.annotations :as annot]))
+  (:require [clojure.data]
+            [clojure.set :refer [union intersection difference]]
+            [clojure.string :as string]
+            [chem.annotations :as annot]))
 
 ;; simple evaluation tools
 
@@ -93,7 +94,7 @@
   (apply concat (map #(doc-engine-list-result-to-chemdner-result % engine-keyword-list) records)))
 
 (defn write-chemdner-resultlist-to-file [filename chemdner-resultlist]
-  (with-open [w (java.io.FileWriter. filename)]
+  (with-open [^java.io.Writer w (java.io.FileWriter. filename)]
     (dorun (map #(.write w (str (string/join "\t" %) "\n"))
                 chemdner-resultlist))))
 
@@ -156,4 +157,109 @@
                 (:docid %)
                 (get-annotation-termlist % engine-keyword))
               annotated-record-list)))
+
+(defn count-nil?
+  "if nil return 0
+   otherwise return count"
+  [value]
+  (if (nil? value) 0 (count value)))
+
+(defn relevant-documents
+  "relevant documents = in-both + gold-only"
+  [comparison annotator0 gold]
+  (reduce (fn [tally diffmap] 
+            (+ tally 
+               (count-nil? (:in-both diffmap))
+               (count-nil? ((keyword (str (name gold) "-only")) diffmap))))
+          0 (vals comparison)))
+
+(defn retrieved-documents
+  "retrieved documents = in-both + test-only"
+  [comparison annotator0 gold]
+  (reduce (fn [tally diffmap] 
+            (+ tally 
+               (count-nil? (:in-both diffmap))
+               (count-nil? ((keyword (str (name annotator0) "-only")) diffmap))))
+          0 (vals comparison)))
+
+(defn intersection-documents
+  "intersection of relevant and retrieved documents = in-both
+
+   intersection = in-both (relevant intersection retrieved)"
+  [comparison annotator0 gold]
+  (reduce (fn [tally diffmap] 
+            (+ tally (count-nil? (:in-both diffmap))))
+          0 (vals comparison)))
+
+(defn calc-precision
+  "Calculate Precision:
+  $$ precision = \\frac{ \\mid relevant\\ docs \\cap retrieved\\ docs \\mid }{ \\mid retrieved\\ docs \\mid }$$"
+  [comparison annotator0 gold]
+    (let [retrieved (retrieved-documents comparison annotator0 gold)
+        intersection (intersection-documents comparison annotator0 gold)]
+    (/ intersection retrieved)))
+
+(defn calc-recall            
+  " Calculate Recall:
+$$ recall = \\frac{ \\mid relevant\\ docs \\cap retrieved\\ docs \\mid }{ \\mid relevant\\ docs \\mid }$$"
+
+  [comparison annotator0 gold]
+  (let [relevant (relevant-documents comparison annotator0 gold)
+        intersection (intersection-documents comparison annotator0 gold)]
+    (/ intersection relevant)))
+
+(defn f-measure 
+  " Calculate F1 measure: $$f_{1} = {2 \\frac{ precision \\cdot recall}{ precision + recall } }$$  "
+  [comparison annotator0 gold]
+  (let [precision (calc-precision comparison annotator0 gold)
+        recall    (calc-recall comparison annotator0 gold)]
+    (* 2 (/ (* precision recall) (+ precision recall)))))
+
+(defn f-beta-measure
+  "Calculate F beta measure:
+$$ f_{\\beta} = { (1 + {\\beta}^2) \\frac{ precision \\cdot  recall}{{(\\beta}^2 \\cdot precision) + recall} } $$ "
+  [comparison beta annotator0 gold]
+  (let [precision (calc-precision comparison annotator0 gold)
+        recall    (calc-recall    comparison annotator0 gold)]
+    (* (+ 1 (* beta beta)) (/ (* precision recall) 
+                              (+ (* (* beta beta) precision) recall)))))
+(defn f1-measure
+  "f_beta measure, beta = 1, basically the same as f measure."
+  [comparison annotator0 gold]
+  (f-beta-measure comparison 1 annotator0 gold))
+
+(defn f2-measure
+  "f_beta measure, beta = 2"
+  [comparison annotator0 gold]
+  (f-beta-measure comparison 2 annotator0 gold))
+
+(defn f05-measure
+  "f_beta measure, beta = 0.5"
+  [comparison annotator0 gold]
+  (f-beta-measure comparison 0.5 annotator0 gold))
+
+
+(defn diff-annotators-mentions
+  "diff annotators by mention (spans)"
+  [normalize-spans normalize-annotations annotations-list0 annotations-list1 label-set]
+  (clojure.data/diff (set (normalize-spans
+                           (normalize-annotations annotations-list0
+                                                  label-set)))
+                     (set (normalize-spans
+                           (normalize-annotations annotations-list1
+                                                  label-set)))))
+
+(defn diff-annotators-indexing
+  "diff annotators by indexing (unique terms present)"
+  [list-unique-terms-with-docid normalize-annotations annotations-list0 annotations-list1 label-set]
+   (let [[in-0 in-1 in-both] (clojure.data/diff (set (list-unique-terms-with-docid
+                                                      (normalize-annotations annotations-list0
+                                                                             label-set)))
+                                                (set (list-unique-terms-with-docid
+                                                      (normalize-annotations annotations-list1
+                                                                             label-set))))]
+     (hash-map
+     :in-0 in-0
+     :in-1 in-1
+     :in-both in-both)))
 
