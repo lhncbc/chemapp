@@ -18,7 +18,7 @@
   (:gen-class))
 
 ;; if running in tomcat this will be the full path of server (not ".")
-(def ^:dynamic *catalina-home* (System/getProperty "catalina.home" "."))
+(def catalina-home (atom (System/getProperty "catalina.home" ".")))
 
 ;; Use JVM option -Dchemapp.properties.file=filename to set location of properties file.
 (def ^:dynamic *properties-fn* (System/getProperty "chemapp.properties.file", "config/chem.properties"))
