@@ -2,7 +2,12 @@
   (:require [opennlp.nlp :as nlp]
             [clojure.string :as string]))
 
-(defonce get-sentences (nlp/make-sentence-detector "data/models/en-sent.bin"))
-(defonce tokenize      (nlp/make-tokenizer "data/models/en-token.bin"))
-(defonce pos-tag       (nlp/make-pos-tagger "data/models/en-pos-maxent.bin"))
+(def get-sentences (atom nil))
+(def tokenize      (atom nil))
+(def pos-tag       (atom nil))
 
+(defn init
+  [root-path]
+  (reset! get-sentences (nlp/make-sentence-detector (str root-path "data/models/en-sent.bin")))
+  (reset! tokenize      (nlp/make-tokenizer (str root-path "data/models/en-token.bin")))
+  (reset! pos-tag       (nlp/make-pos-tagger (str root-path "data/models/en-pos-maxent.bin"))))
