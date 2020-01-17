@@ -7,7 +7,8 @@
             [chem.stopwords :as stopwords]
             [chem.dictionaries :as dict]
             [chem.chemdner-tools :as chemdner-tools]
-            [chem.token-partial :as token-partial]))
+            [chem.token-partial :as token-partial]
+            [chem.opennlp :refer [get-sentences pos-tag]]))
 
 ;; When using Mallet:
 ;;
@@ -21,9 +22,6 @@
 ;; That is, each line represents one token, and has the format:
 ;;
 ;;     feature1 feature2 ... featuren label
-
-(defonce get-sentences (nlp/make-sentence-detector "models/en-sent.bin"))
-(defonce pos-tag       (nlp/make-pos-tagger "models/en-pos-maxent.bin"))
 
 (defonce ^:dynamic *chemical-type-map* nil)
 
@@ -97,10 +95,10 @@
 (defn add-pos-tags
   "Add part of speech info for tokens in tokenlist."
  [maptokenlist]
-  (map #(merge %1 %2)
+  (map merge
        maptokenlist
        (map #(hash-map :text (first %) :pos (second %)) 
-            (pos-tag (map #(:text %) maptokenlist)))))
+            (@pos-tag (map #(:text %) maptokenlist)))))
 
 (defn extract-sentence-features [docid sentence-smap]
   (let [sentence-tokenlist
@@ -123,9 +121,9 @@
   (map #(extract-sentence-features (:docid record) %)
        (concat
         (map #(make-sentence-map (:title record) "T" %)
-             (get-sentences (:title record)))
+             (@get-sentences (:title record)))
         (map #(make-sentence-map (:abstract record) "A" %)
-             (get-sentences (:abstract record))))))
+             (@get-sentences (:abstract record))))))
 
 (defn is-stopword [text]
   (if (contains? stopwords/stopwords (string/lower-case text))
@@ -161,9 +159,8 @@
          (map #(list (:text %)
                      ;; (string/upper-case (tokenization/classify-token-2 (first %)))
                      ;; (:location %)
-                     (chem-fragment-present (first %))
+                     (chemical-type (first %))
                      (is-stopword (:text %))
-                     (:pos %)
                      (:class %)
                      (:type %))
               sentence-featurelist))
@@ -188,9 +185,11 @@
   "write features converting space features to \\s."
   [w sentence-feature-list]
   (dorun 
-   (map #(.write w (format "%s\n" (string/join " " %)))
-        (filter #(not (= (first %) " "))
-                sentence-feature-list))))
+   (.write w
+           (format "%s"
+                   (string/join " " 
+                                (filter #(not (= (first %) " "))
+                                        sentence-feature-list))))))
 
 (defn write-stream-record-features 
   [w record]
@@ -235,12 +234,13 @@
 
 (defn write-sentence-unlabelled-features
   "Write features without labels for testing purposes."
-[w sentence-feature-list]
+  [w sentence-feature-list]
   (dorun 
-   (map
-    #(.write w (format "%s\n" (string/join " " (butlast %))))
-    (filter #(not (= (first %) " "))
-            sentence-feature-list))))
+   (.write w (format "%s"
+                     (string/join " "
+                                  (butlast 
+                                   (filter #(not (= (first %) " "))
+                                           sentence-feature-list)))))))
 
 
 (defn write-stream-record-unlabelled-features 
