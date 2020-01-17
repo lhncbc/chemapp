@@ -1,14 +1,13 @@
 (ns chem.metamap-annotation
-  (:use [clojure.set])
-  (:require [clojure.string :as string])
-  (:require [metamap-api.metamap-api :as metamap-api])
-  (:require [chem.semtypes :as semtypes])
-  (:require [chem.annotations :as annotlib])
-  (:require [skr.tokenization :as tokenization])
-  (:require [chem.stopwords :as stopwords])
-  (:require [chem.mti-filtering :as mti-filtering])
-  (:require [chem.span-utils :as span-utils])
-  (:require [skr.mwi-utilities :as mwi-utilities]))
+  (:require [clojure.set :refer :all]
+            [clojure.string :as string]
+            [chem.semtypes :as semtypes]
+            [chem.annotations :as annotlib]
+            [skr.tokenization :as tokenization]
+            [chem.stopwords :as stopwords]
+            [chem.mti-filtering :as mti-filtering]
+            [chem.span-utils :as span-utils]
+            [skr.mwi-utilities :as mwi-utilities]))
 
 ;; Generate annotations from MetaMap API results
 
@@ -136,9 +135,10 @@
 (defn annotate-document
   "Generate annotations from document text."
   [mmapi-inst document-text]
-  (let [result (metamap-api/handle-result-list
-                (metamap-api/process-utf8-string mmapi-inst document-text "-C"))]
-    (hash-map :annotations result)))
+  ;; (let [result (metamap-api/handle-result-list
+  ;;               (metamap-api/process-utf8-string mmapi-inst document-text "-C"))]
+  ;;   (hash-map :annotations result))
+  )
 
 (defn filter-document-annotations [annotation-list semtypelist]
   ^{:doc "Keep annotations that have semantic-types in semtypelist." }
@@ -208,8 +208,7 @@ includes punctuation, numbers, words of length 1."
   "Query MetaMap using term processing to determine concepts for
    annotation texts for document."
   (map (fn [annotation]
-         (let [mm-annotationlist 
-                (metamap-api/process-utf8-string mmapi (:text annotation) "-zC")
+         (let [mm-annotationlist [] ;; (metamap-api/process-utf8-string mmapi (:text annotation) "-zC")
                mappings-list (first (:mappings-list (first mm-annotationlist)))]
            (if (empty? mm-annotationlist)
              annotation
