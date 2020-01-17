@@ -1,7 +1,5 @@
 (ns chem.rules
-  (:require [instaparse.core :as insta]
-            [chem.mongodb :as mongodb])
-  
+  (:require [chem.irutils-normchem :as normchem])
   (:gen-class))
 
 ;;
@@ -64,7 +62,9 @@
   (contains? #{:rule1 :rule2 :rule3 :rule4 :rule5 :rule7} word-type))
 
 (defn chemical? [word]
-  (> (count (mongodb/lookup "normchem" word)) 0))
+  ;; (> (count (mongodb/lookup "normchem" word)) 0)
+  ;; use lucene for chemical lookup instead.
+  (normchem/lookup word))
 
 (def badending-set #{"ing", "mic", "tion", "ed", "sis", "ism", "coccus" "ment" "ies" "oli" "lyte"})
 
@@ -75,13 +75,15 @@
            (contains? badending-set (.substring word (- (.length word) 4)))
            (contains? badending-set (.substring word (- (.length word) 6))))))
 
-(defn has-badending-v2? [word]
+(defn has-badending-v2?
+  [word]
   (not (every? #(nil? %)
                (map (fn [ending]
                       (re-find (java.util.regex.Pattern/compile (format "%s$" ending)) word))
                       badending-set))))
     
-(defn has-badending? [word]
+(defn has-badending?
+  [word]
   (and (not (or (= "glutamic" word) (= "polychlorinated" word)))
        (> (.length word) 6)
        (some #(re-find (java.util.regex.Pattern/compile (format "%s$" %)) word)
