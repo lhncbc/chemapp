@@ -131,8 +131,9 @@ classifier qrels (:m-qrels)" }
     (hash-map :l-weights (vec l-weights)
               :m-predict-map (into {} mPredict))))
 
-(defn collect-document-pairs [meta-data] 
+(defn collect-document-pairs
   "Collect term/confidence pairs by document"
+  [meta-data]
   (reduce (fn [newmap el]
             (let [key (first el)
                   pair (rest el)]         ;term-confidence pair
@@ -142,15 +143,17 @@ classifier qrels (:m-qrels)" }
           {} meta-data))
 
 
-`(defn meta-data-pairs-to-map [meta-data-pairs]
+(defn meta-data-pairs-to-map
   "From meta data term confidence pairs generate base classifier prediction map."
+  [meta-data-pairs]
   (into {} (map (fn [el]
                   (let [key (first el)
                         value (if (string? (second el)) (edn/read-string (second el)) (second el))]
                   (vec (list key value)))) meta-data-pairs)))
 
-(defn meta-data-map-list-for-docid [docid metadata-classifier-map ordered-classifier-key-list]
+(defn meta-data-map-list-for-docid
   "Generate list of base classifier predictions maps from meta data term confidences from base classifiers."
+  [docid metadata-classifier-map ordered-classifier-key-list]
   (map (fn [classifier-key] 
          (let [metadata (metadata-classifier-map classifier-key)]
            (if (contains? metadata docid)
