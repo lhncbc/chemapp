@@ -19,7 +19,7 @@
   "Builds a trie over the values in the specified seq coll."
   (reduce (fn [newtrie [x metadata]]
             (add-to-trie newtrie x metadata)))
-          {} coll))
+          {} coll)
                    
 (defn get-meta-data [trie x]
   "Returns metadata if the value x exists in the specified trie."
