@@ -1,12 +1,12 @@
 (ns chem.stacking
   (:use [clojure.pprint])
-  (:require [chem.partial :as partial]
+  (:require [clojure.edn :as edn] 
+            [chem.partial :as partial]
             [chem.annotations :as annot]
             [chem.metamap-annotation :as mm-annot]
             [chem.metamap-tokenization :as mm-tokenization]
-            [chem.metamap-api :as metamap-api]
             [chem.stanford-ner :as stanford-ner]
-            [chem.normchem]
+            [chem.irutils-normchem :as normchem]
             [chem.opsin]
             [chem.process :as process]
             [chem.ctx-utils :as ctx-utils]
@@ -142,11 +142,11 @@ classifier qrels (:m-qrels)" }
           {} meta-data))
 
 
-(defn meta-data-pairs-to-map [meta-data-pairs]
+`(defn meta-data-pairs-to-map [meta-data-pairs]
   "From meta data term confidence pairs generate base classifier prediction map."
   (into {} (map (fn [el]
                   (let [key (first el)
-                        value (if (string? (second el)) (read-string (second el)) (second el))]
+                        value (if (string? (second el)) (edn/read-string (second el)) (second el))]
                   (vec (list key value)))) meta-data-pairs)))
 
 (defn meta-data-map-list-for-docid [docid metadata-classifier-map ordered-classifier-key-list]
@@ -219,32 +219,34 @@ classifier qrels (:m-qrels)" }
   (let [term-trie (ctx-utils/new-trie-hash-table)
         normchem-line-list (chem.utils/line-seq-from-file normchem-file)]
     (ctx-utils/add-mesh-terms-to-trie term-trie normchem-line-list)
-    (chem.normchem/init)
+    ;; (normchem/init)
     (hash-map :ner-classifier (stanford-ner/load-classifier ner-classifier-serialized-file)
               :term-trie term-trie)))
 
-(defn subsume-classify-record [mm-api-instance record]
-  (into {}
-        (map #(vec (list % 1.0))
-             (:flow1-matched-terms
-              (chem.process/subsume-flow
-               (chem.process/flow1
-                (annot/annotate-record 
-                 :subsume
-                 chem.normchem/process-document 
-                 (chem.process/add-partial-match-annotations 
-                  (filter-mm-annotations 
-                   (chem.process/add-metamap-annotations mm-api-instance record))))))))))
+;; (defn subsume-classify-record [mm-api-instance record]
+;;   (into {}
+;;         (map #(vec (list % 1.0))
+;;              (:flow1-matched-terms
+;;               (chem.process/subsume-flow
+;;                (chem.process/flow1
+;;                 (annot/annotate-record 
+;;                  :subsume
+;;                  normchem/process-document 
+;;                  (chem.process/add-partial-match-annotations 
+;;                   (filter-mm-annotations 
+;;                    (chem.process/add-metamap-annotations mm-api-instance record))))))))))
 
 (defn concat-enchilada0-title-annotations [annotated-record]
   (concat (-> annotated-record :token-opsin :title-result :annotations)
           (-> annotated-record :partial-opsin :title-result :annotations)
-          (-> annotated-record :partial-normchem :title-result :annotations)))
+          (-> annotated-record :partial-normchem :title-result :annotations)
+          (-> annotated-record :partial :title-result :annotations)))
 
 (defn concat-enchilada0-abstract-annotations [annotated-record]
   (concat (-> annotated-record :token-opsin :abstract-result :annotations)
           (-> annotated-record :partial-opsin :abstract-result :annotations)
-          (-> annotated-record :partial-normchem :abstract-result :annotations)))
+          (-> annotated-record :partial-normchem :title-result :annotations)
+          (-> annotated-record :partial :abstract-result :annotations)))
 
 (defn concat-enchilada0-annotations [annotated-record]
   (concat 
@@ -259,10 +261,10 @@ classifier qrels (:m-qrels)" }
                           (conj record
                                 (chem.opsin/filter-using-engine-keyword token-record :token)
                                 (chem.opsin/filter-using-engine-keyword partial-record :partial)
-                                (chem.normchem/filter-partial-match-using-normchem partial-record)
+                                ;; (normchem/filter-partial-match-using-normchem partial-record)
                                 token-record
                                 partial-record )
-                          [:token-opsin :partial-normchem :partial-opsin])]
+                          [:token-opsin :partial-normchem :partial-opsin :partial])]
     (conj aggregate-record
           (hash-map :enchilada0 
                     (hash-map :title-result 
@@ -274,7 +276,7 @@ classifier qrels (:m-qrels)" }
   "Make annotations from enchilada0 NER into pairs usable by meta-classifier."
   (vec
    (set
-    (map #(vec (list (:text %) 1.0))
+    (pmap #(vec (list (:text %) 1.0))
          (concat
           (-> annotated-record :enchilada0 :title-result :annotations)
           (-> annotated-record :enchilada0 :abstract-result :annotations))))))
@@ -298,10 +300,9 @@ classifier qrels (:m-qrels)" }
     (chem.stanford-ner/annotate-record :stanford-ner ner-classifier record))))
 
 (defn classify-record [ner-classifier l-weights ordered-classifier-key-list record]
-  (let []
-    (classify (double-array l-weights)
-              (meta-data-map-list-for-record 
-               (hash-map :trie-ner ()
-                         :stanford-ner (stanford-ner-classify-record ner-classifier record)
-                         :enchilada0 (enchilada0-classify-record record))
-               ordered-classifier-key-list))))
+  (classify (double-array l-weights)
+            (meta-data-map-list-for-record 
+             (hash-map :trie-ner ()
+                       :stanford-ner (stanford-ner-classify-record ner-classifier record)
+                       :enchilada0 (enchilada0-classify-record record))
+             ordered-classifier-key-list)))

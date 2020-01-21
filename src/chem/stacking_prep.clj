@@ -1,5 +1,8 @@
 (ns chem.stacking-prep
-  (:require [chem.metamap-annotation :as mm-annot]))
+  (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
+            [clojure.math.numeric-tower :as math]
+            [chem.metamap-annotation :as mm-annot]))
 
 (defn average-probabilities [table]
   (map #(list (first %) (/ (apply + (second %)) (count (second %))))
@@ -88,13 +91,13 @@
 
 (defn write-data [outfilename meta-data]
   ^{:doc "write meta data for stacking program to file."}
-   (with-open [w (java.io.FileWriter. outfilename)]   
+   (with-open [w (io/writer outfilename)]   
      (dorun
       (map #(.write w (format "%s\t%f\n" (first %) (second %))) meta-data))))
 
 (defn read-data [infilename]
   (map #(clojure.string/split % #"\t")
-       (chem.utils/line-seq-from-file infilename)))
+       (line-seq (io/reader infilename))))
 
 (defn mm-evlist-to-labels-with-scores [docid resultlist input-text]
   "Convert metamap evlist to labels scores"
@@ -102,10 +105,10 @@
          (let [start (:start (first (el :position)))
                end  (+ start (:length (first (el :position))))
                label (format "%s$%s$%s$%s" (subs input-text start end) docid start end)]
-           (list label (* (Math/abs (el :score)) 1.0))))
+           (list label (* (math/abs (el :score)) 1.0))))
        (mm-annot/keep-ev-elements resultlist)))
 
-(defn chemdner-resultlist-to-meta-data-with-docid [chemdner-resultlist]
+(defn chemdner-resultlist-to-meta-data-with-docid-v1 [chemdner-resultlist]
   "Convert CHEMDNER resultlist file into the format needed by the Meta
    Stacking program."
   (map (fn [el]
@@ -115,19 +118,31 @@
            (list docid term score)))
        chemdner-resultlist))
 
-(defn chemdner-resultlist-to-meta-data [chemdner-resultlist]
+(defn chemdner-resultlist-to-meta-data-with-docid [chemdner-resultlist]
   "Convert CHEMDNER resultlist file into the format needed by the Meta
    Stacking program."
   (map (fn [el]
          (let [docid (if (integer? (nth el 0))
                        (nth el 0)
-                       (read-string (nth el 0)))
+                       (edn/read-string (nth el 0)))
                term (nth el 1)
                score (if (number? (nth el 3))
                        (nth el 3)
-                       (read-string (nth el 3)))]
+                       (edn/read-string (nth el 3)))]
            (vec (list docid term score))))
        chemdner-resultlist))
+
+(defn chemdner-resultlist-to-meta-data [chemdner-resultlist]
+  "Convert CHEMDNER resultlist file into the format needed by the Meta
+   Stacking program."
+  (map (fn [el]
+         (let [term (nth el 1)
+               score (if (number? (nth el 3))
+                       (nth el 3)
+                       (edn/read-string (nth el 3)))]
+           (vec (list term score))))
+       chemdner-resultlist))
+
 
 (defn gen-qrels-with-docid [gold-standard-pair-list]
   "Given gold standard for NER, generate qrels table for Meta Stacking
