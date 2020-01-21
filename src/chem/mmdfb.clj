@@ -1,8 +1,8 @@
 (ns chem.mmdfb
   (:import (java.io BufferedReader FileReader))
-  (:require [clojure.string :as string])
-  (:require [chem.mongodb :as chemdb])
-  (:require [chem.utils :as utils])
+  (:require [clojure.string :as string]
+            [chem.irutils-normchem :as chemdb]
+            [chem.utils :as utils])
   (:gen-class))
 
 ;; Generate MRCONSO from dui, cid, and chemical name
@@ -54,8 +54,8 @@
 (defn get-duis-for-chemnames [chemnamelist]
   (filter #(not (nil? %))
           (map (fn [chemname]
-                 (let [key (.toLowerCase chemname)
-                       result (first (chemdb/lookup :normchem key))]
+                 (let [key (string/lower-case chemname)
+                       result (first (chemdb/lookup key))]
                    (when (> (count result) 0)
                      (hash-map :key key
                                :value (:value result)))))
