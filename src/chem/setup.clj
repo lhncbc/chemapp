@@ -4,7 +4,7 @@
 
 ;; Load CHEMDNER training, testing, and development corpora.
 
-(defn load-chemdner-training-data []
+(defn load-chemdner-data []
   ^{:doc "load chemdner training data into map."}
   (let [training-records (chemdner-tools/load-chemdner-abstracts chemdner-paths/training-text)
         chemdner-training-cdi-gold (chem.chemdner-tools/load-training-document-entity-gold-standard 
