@@ -9,7 +9,10 @@
             [skr.mwi-utilities :as mwi-utilities]
             [chem.annotation-utils :as annotation-utils]
             [chem.extract-abbrev :as extract-abbrev]
-            [chem.opennlp :refer [get-sentences tokenize pos-tag]])
+            [chem.opennlp :refer [get-sentences tokenize pos-tag]]
+            [chem.metamap-tokenization :refer [make-map-tokenlist
+                                               classify-tokens
+                                               add-spans]])
   (:gen-class))
 
 (defn make-sentence-list 
@@ -17,7 +20,7 @@
   (map #(hash-map :sentence %
                   :span {:start (.indexOf document ^String %)
                          :end (+ (.indexOf document ^String %) (count %))})
-       (get-sentences document)))
+       (@get-sentences document)))
 
 (defn tokenize-sentences
   "expects list of sentence structures of form {:sentence <string> :span {:start <int> :end <int>}}
@@ -36,18 +39,26 @@
        9 : keep whitespace, preserve IUPAC chemicals (aggressive)
       10 : keep whitespace, preserve IUPAC chemicals, remove trailing commas. (aggressive)"
   ([sentence-list]
-   (tokenize-sentences 2))
+   (tokenize-sentences sentence-list 2))
   ([sentence-list tokenize-style]
    (map (fn [sentence]
           (assoc sentence :tokenlist (mm-tokenization/tokenize (:sentence sentence) tokenize-style)))
         sentence-list)))
 
 (defn pos-tag-sentence-list 
-  " Expects list of maps of form {:sentence <sentence> :tokenlist <tokenlist>} 
-  returns list of maps of form: {:sentence <sentence> :tokenlist <tokenlist> :pos-tags <tokenlist with part-of-speech tags>}"
+  " Expects list of maps of form:
+
+       {:sentence <sentence>
+        :tokenlist <tokenlist>} 
+
+  returns list of maps of form:
+
+       {:sentence <sentence>
+        :tokenlist <tokenlist>
+        :pos-tags <tokenlist with part-of-speech tags>}"
   [tokenized-sentence-list]
   (map (fn [sentence]
-         (assoc sentence :pos-tags (pos-tag (:tokenlist sentence))))
+         (assoc sentence :pos-tags (@pos-tag (:tokenlist sentence))))
        tokenized-sentence-list))
 
 
@@ -56,51 +67,57 @@
   with keywords :part-of-speech :text and :span.  If passing a
   sentence map structure (smap) then add mapping :pos-tags-enhanced to
   hold token map. "
-  ([^String sentence-text sentence-span tagged-tokenlist]
-   (map (fn [token]
-          (let [^String token-text (nth token 0)
+  ([^String sentence-text sentence-span tagged-tokenlist tokenlist]
+   (map (fn [tagged-token mapped-token]
+          (let [^String token-text (nth tagged-token 0)
                 sentence-start (:start sentence-span) 
-                start (.indexOf sentence-text token-text) ;start within sentence
-                end   (+ start (count token-text))]
+                start (-> mapped-token :span :start)
+                end   (-> mapped-token :span :end)]
             (hash-map :text token-text
-                      :part-of-speech (nth token 1)
+                      :part-of-speech (nth tagged-token 1)
                       :span {:start (+ sentence-start start)
                              :end   (+ sentence-start start (count token-text))})))
-        tagged-tokenlist))
+        tagged-tokenlist
+        (-> tokenlist make-map-tokenlist classify-tokens add-spans)))
   ([sentence-smap]
      (assoc sentence-smap 
        :pos-tags-enhanced 
-       (add-spans-to-sentence-pos-tags (:sentence sentence-smap) (:span sentence-smap) (:pos-tags sentence-smap)))))
+       (add-spans-to-sentence-pos-tags
+        (:sentence sentence-smap) (:span sentence-smap)
+        (:pos-tags sentence-smap) (:tokenlist sentence-smap)))))
 
 (defn add-spans-and-classes-to-sentence-pos-tags-no-ws
   "Spans and character classes to tokens with part-of-speech info.
   Convert tokens to maps with keywords :part-of-speech :text
   and :span.  If passing a sentence map structure (smap) then add
   mapping :pos-tags-enhanced to hold token map. "
-  ([^String sentence-text sentence-span tagged-tokenlist]
+  ([^String sentence-text sentence-span tagged-tokenlist tokenlist]
    (filter #(not= (:class %) "ws")
-           (map (fn [token]
-                  (let [^String token-text (nth token 0)
+           (map (fn [tagged-token mapped-token]
+                  (let [^String token-text (nth tagged-token 0)
                         sentence-start (:start sentence-span) 
-                        start (.indexOf sentence-text token-text) ;start within sentence
-                        end   (+ start (count token-text))]
+                        start (-> mapped-token :span :start)
+                        end   (-> mapped-token :span :end)]
                     (hash-map :text token-text
-                              :part-of-speech (nth token 1)
+                              :part-of-speech (nth tagged-token 1)
                               :class (mm-tokenization/classify-token token-text)
                               :span {:start (+ sentence-start start)
                                      :end   (+ sentence-start start (count token-text))})))
-                tagged-tokenlist)))
+                tagged-tokenlist
+                (-> tokenlist make-map-tokenlist classify-tokens add-spans))))
   ([sentence-smap]
      (assoc sentence-smap 
        :pos-tags-enhanced 
        (add-spans-and-classes-to-sentence-pos-tags-no-ws
-        (:sentence sentence-smap) (:span sentence-smap) (:pos-tags sentence-smap)))))
+        (:sentence sentence-smap) (:span sentence-smap)
+        (:pos-tags sentence-smap) (:tokenlist sentence-smap)))))
 
 (defn enhance-sentence-list-pos-tags
   [sentence-list]
   (map add-spans-to-sentence-pos-tags sentence-list))
 
 (defn enhance-sentence-list-pos-tags-spans-and-classes-no-ws
+  "Add spans and classes to sentences in sentence list."
   [sentence-list]
   (map add-spans-and-classes-to-sentence-pos-tags-no-ws sentence-list))
 
