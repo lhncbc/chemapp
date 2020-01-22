@@ -1,11 +1,12 @@
 (ns chem.regbasicname-utils
   (:require [clojure.edn :as edn]
-            [clojure.string :as clstring]
+            [clojure.string :as cljstring]
             [clj-diff.core]
             [skr.tokenization]
             [utils.utils :as utils]
             [chem.extract-abbrev :as extract-abbrev]
-            [chem.sentences :as sentences]))
+            [chem.sentences :as sentences]
+            [chem.stopwords :as stopwords]))
 
 ;; [["ABIET"]
 ;;  ["ABIETIN"]
@@ -29,25 +30,39 @@
 
 (defn load-dictionary-0 [aseq]
    (reduce (fn [newmap line]
-             (let [fields (clstring/split line #"->")
-                   key (clstring/trim (first fields))
-                   value (clstring/split 
+             (let [fields (cljstring/split line #"->")
+                   key (cljstring/trim (first fields))
+                   value (cljstring/split 
                           (if (> (count fields) 1)
-                            (clstring/trim (second fields))
+                            (cljstring/trim (second fields))
                             (first fields))
                           #" ")]
                (assoc newmap 
                  key value
-                 (clstring/lower-case key) value)))
+                 (cljstring/lower-case key) value)))
            {} aseq))
 
 (defn load-dictionary [filename]
   (-> filename utils/line-seq-from-file load-dictionary-0))
 
-(def ^:dynamic *regbasename-dictionary*
-  (load-dictionary "regbasicname.dat"))
+(def ^:dynamic *regbasename-dictionary* {})
 
+;; Partial implementation of Registry File Basic Name Segment
+;; Dictionary lookup algorithm.
 ;;
+;; from: paper: Registry File Basic Name Segment Dictionary, June
+;; 1993, American Chemical Society.
+;; (https://www.cas.org/sites/default/files/documents/regbasicname.pdf)
+;;
+;; See Also:
+;;
+;; Batista-Navarro R, Rak R, Ananiadou S. Optimising chemical named
+;; entity recognition with pre-processing analytics, knowledge-rich
+;; features and heuristics. J Cheminform. 2015;7(Suppl 1 Text mining
+;; for chemistry and the CHEMDNER track):S6. Published 2015 Jan
+;; 19. doi:10.1186/1758-2946-7-S1-S6 ;
+;;
+;; 
 ;; A different approach is used to create the basic segments from the
 ;; natural name segments. The steps involved are illustrated with the
 ;; natural segment "dicyclopenta" from the example above.
@@ -112,7 +127,15 @@
    "phosphatidylcholine" "albumins" "diacylglycerol ether" "triacylglycerols"
    "monoacylglycerol ethers" "diacylglycerol ethers" "fatty acid ethyl esters"
    "Colesevelam" "metformin" "bile acid" "glucagon-like peptide"
-])
+   ])
+
+(defn init
+  "Initialize Basic Segment Dictionary from file or default
+  location (data/regbasicname.dat)."
+  ([]
+   (load-dictionary "data/regbasicname.dat"))
+  ([filename]
+   (load-dictionary filename)))
 
 (defn list-components-debug
   [term]
@@ -164,11 +187,16 @@
        
 (defn coverage 
   [term]
-(let [lterm (clstring/lower-case term)
+(let [lterm (cljstring/lower-case term)
       components (list-components term)
-      lcomponentstring (clstring/lower-case (apply str components))
+      lcomponentstring (cljstring/lower-case (apply str components))
       normterm (remove-punctuation-and-whitespace term)]
   (cond 
+    (or (re-find skr.tokenization/pnpattern term)
+        (re-find skr.tokenization/nupattern term)) 0.0
+    (= (cljstring/trim term) "") 0.0
+    (> (count (cljstring/trim term)) 1) 0.0
+    (contains? stopwords/stopwords term) 0.0
     (not (empty? (filter #(re-find (re-pattern (str % "$")) lterm)
                   ["ing", "mic", "tion", "ed", "sis", "ism", "coccus"])))
     0.0
@@ -195,8 +223,9 @@
 
 (defn get-token-matches
   [tokenlist] 
-  (filter #(> (coverage (:text %)) 0.5)
-          tokenlist))
+  (filter #(> (:coverage %) 0.65)
+          (map #(assoc % :coverage (coverage (:text %)))
+                 tokenlist)))
 
 (defn consolidate-matches 
   [token-match-list tokenlist]
@@ -223,5 +252,6 @@
               :annotations (sort-by #(-> % :span :start) (set enhanced-annotation-list))
               :sentence-list tagged-sentence-list
               :tokenlist tokenlist
+              :token-match-list token-match-list 
               :abbrev-list abbrev-list)))
 
