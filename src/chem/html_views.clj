@@ -327,7 +327,8 @@ function process( ){
 
 ")
 
-(defn pubmed-entry-page []
+(defn pubmed-entry-page
+  [req]
   (html
    (doctype :xhtml-strict)
    (xhtml-tag 
@@ -353,5 +354,7 @@ function process( ){
         [:p {:id "abstract"} "ABSTRACT"]]]
       [:div {:id "footer"}
        [:address
+        [:a {:href (str (:servlet-context-path req) "/")}
+         (str "Annotation Viewer - " @front-page-title)] " | "
         [:a {:href "http://ii.nlm.nih.gov"} "Indexing Initiative"]]]]]
     )))

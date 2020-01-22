@@ -75,12 +75,12 @@
                                     (get (:params req) "engine")
                                     "combine3")))))
 
-  (GET "/pubmed/" [] (pubmed-entry-page))
+  (GET "/pubmed/" [req] (pubmed-entry-page req))
   (GET "/pubmed/:pmid/" [pmid] 
     (log/debug (str "/pubmed " pmid))
     (json-views/pubmed-output pmid))
 
-  (GET "/pubmedjson/" [] (pubmed-entry-page))
+  (GET "/pubmedjson/" [req] (pubmed-entry-page req))
   (GET "/pubmedjson/:pmid/" [pmid] 
     (log/debug (str "/pubmedjson " pmid))
     (json-views/pubmed-output pmid))
