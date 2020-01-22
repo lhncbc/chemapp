@@ -336,7 +336,7 @@ function process( ){
      [:meta {:http-equiv "Content-type"
              :content "text/html; charset=utf-8"}]
      [:title (str "PubMed Annotation Viewer")]
-     (include-css "http://indlx1.nlm.nih.gov:8000/css/style.css")
+     (include-css "/css/style.css")
      (javascript-tag annotation-display-js)]
     [:body 
      [:h1 "PubMed Annotation Viewer"]
