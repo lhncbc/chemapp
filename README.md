@@ -19,10 +19,28 @@ copy the content of the directories to the deployment jar.
 
 ## Usage
 
-The command line arguments the server are: [hostname [port]]
+The command line arguments the socket server are: [hostname [port]]
 The server defaults to localhost on port 32000 unless specified.
 
     $ java -jar chem-0.1.0-standalone.jar [args]
+
+## Caveats
+
+This system was primarily an experiment started in 2013 and has quite
+a few short comings.   I was learning Clojure at the time after
+previously attempting to implement the system in Python and then
+Java.   Initially, Clojure was intended to be used only for
+prototyping and then the final system would be written in Java.  That
+system never materialized.
+
+The current dispatch system in process.clj should be re-implemented
+using multi-methods.
+
+Recognition technologies conceived later are absent, including Deep
+Learning approaches such as Bi-LSTMs, CNN/RNN, Attention, and
+Transformers.  These could probably be added using Neanderthal
+(https://neanderthal.uncomplicate.org/) or
+(https://aria42.com/blog/2017/11/Flare-Clojure-Neural-Net)
 
 ## Options
 
@@ -36,7 +54,7 @@ directory the server is executed from.  When using the servlet the
 data directory resides in the servlet engine directory (usually
 tomcat) or in some cases it must be deployed with the servlet and
 resides in the servlet deployment directory (for instance:
-webapps/chemapp.)
+webapps/chemapp/data.)
 
     corncob_lowercase.txt  - a file 
     ivf       - contains IRutils version of normchem database (2017)
