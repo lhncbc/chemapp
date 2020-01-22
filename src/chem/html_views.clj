@@ -36,7 +36,7 @@
                  [:address
                   (if (= title @front-page-title)
                     (str "Annotation Viewer - " @front-page-title)
-                    [:a {:href (str (:servlet-context-path req) "/")} (str "Annotation Viewer - " front-page-title)]) " | "
+                    [:a {:href (str (:servlet-context-path req) "/")} (str "Annotation Viewer - " @front-page-title)]) " | "
                   [:a {:href "http://ii.nlm.nih.gov"} "Indexing Initiative"]]]
                 
                 ]])))
