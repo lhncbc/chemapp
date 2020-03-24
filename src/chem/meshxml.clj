@@ -6,30 +6,40 @@
             [clojure.string :as string])
   (:use [clojure.zip :only [xml-zip node]]
         [clojure.set :only [intersection union]])
-  (:import (java.io PrintWriter FileWriter
+  (:import (java.io PrintWriter FileWriter Writer
                     BufferedReader FileReader)))
+
+;; this is old, use chem.mesh-chem (mesh_chem.clj) instead.
 
 (def xml2003samplefn "/export/home/wjrogers/Notes/RTMUpdate/xml2003sample.xml")
 (def xml2015samplefn "/export/home/wjrogers/studio/clojure/chem/xml2015sample.txt")
 (def xml2015sample2fn "/export/home/wjrogers/studio/clojure/chem/desc2015sample.xml")
 (def supp2015sample2fn "/export/home/wjrogers/studio/clojure/chem/scrsample.xml")
-(def desc-2012fn "/nfsvol/nls3aux22/MeSHUpdate/2012/originalmesh/xmlmesh/desc2012.xml")
-(def desc-2014fn "/nfsvol/nls/MEDLINE_Baseline_Repository/MeSH/2014/desc2014.xml") 
-(def supp-2014fn "/nfsvol/nls/MEDLINE_Baseline_Repository/MeSH/2014/supp2014.xml")
-(def desc-2015fn "/nfsvol/nls/MEDLINE_Baseline_Repository/MeSH/2015/desc2015.xml") 
-(def supp-2015fn "/nfsvol/nls/MEDLINE_Baseline_Repository/MeSH/2015/supp2015.xml")
+(def desc-2012fn "/net/lhcdevfiler/vol/cgsb5/ind/II_Group_WorkArea3aux22/MeSHUpdate/2012/originalmesh/xmlmesh/desc2012.xml")
+
+(def mesh-dir "/net/lhcdevfiler/vol/cgsb5/ind/II_Group_WorkArea/MEDLINE_Baseline_Repository/MeSH")
+(def desc-2014fn (str mesh-dir "/2014/desc2014.xml"))
+(def supp-2014fn (str mesh-dir "/2014/supp2014.xml"))
+(def desc-2015fn (str mesh-dir "/2015/desc2015.xml"))
+(def supp-2015fn (str mesh-dir "/2015/supp2015.xml"))
+(def desc-2016fn (str mesh-dir "/2016/desc2016.xml"))
+(def supp-2016fn (str mesh-dir "/2016/supp2016.xml"))
+(def desc-2017fn (str mesh-dir "/2017/desc2017.xml"))
+(def supp-2017fn (str mesh-dir "/2017/supp2017.xml"))
+(def desc-2018fn (str mesh-dir "/2018/desc2018.xml"))
+(def supp-2018fn (str mesh-dir "/2018/supp2018.xml"))
 
 ;; Convenience function, first seen at nakkaya.com later in clj.zip src.
 ;; Equivalent to: (-> responsexml clojure.data.xml/parse-str  clojure.zip/xml-zip)
-(defn zip-str [s]
+(defn zip-str [^String s]
   (xml-zip 
       (xml/parse (java.io.ByteArrayInputStream. (.getBytes s)))))
 
-(defn zip-file [filename]
+(defn zip-file [^String filename]
   (xml-zip 
    (xml/parse (java.io.FileInputStream. filename))))
 
-(defn dom-file [filename]
+(defn dom-file [^String filename]
    (xml/parse (java.io.FileInputStream. filename)))
 
 (defn xml-content
@@ -189,16 +199,16 @@
 
 (defn write-tabbed-descriptor-info
   "Write descriptor information in tabbed-separated format to writer."
-  [wtr descriptor-element]
+  [^Writer wtr descriptor-element]
   (let [record-info (get-descriptor-info descriptor-element)]
     (when (or (seq (:casn1name record-info))
               (seq (intersection (:semantic-type-list record-info)
                                          *chemical-semtypes*)))
-      (.write wtr (format-tabbed-info record-info)))))
+      (.write wtr ^String (format-tabbed-info record-info)))))
 
 (defn write-edn-descriptor-info
   "Write descriptor information in tabbed-separated format to writer."
-  [wtr descriptor-element]
+  [^Writer wtr descriptor-element]
   (let [record-info (get-descriptor-info descriptor-element)]
     (when (or (seq (:casn1name record-info))
               (seq (intersection (:semantic-type-list record-info)
@@ -208,16 +218,16 @@
 
 (defn write-tabbed-supplemental-record-info
   "Write supplemental record information in tabbed-separated format to writer."
-  [wtr supplemental-record-element]
+  [^Writer wtr supplemental-record-element]
   (let [record-info (get-supplemental-record-info supplemental-record-element)]
     (when (or (seq (:casn1name record-info))
               (seq (intersection (:semantic-type-list record-info)
                                          *chemical-semtypes*)))
-      (.write wtr (format-tabbed-info record-info)))))
+      (.write wtr ^String (format-tabbed-info record-info)))))
 
 (defn write-edn-supplemental-record-info
   "Write supplemental record information in tabbed-separated format to writer."
-  [wtr supplemental-record-element]
+  [^Writer wtr supplemental-record-element]
   (let [record-info (get-supplemental-record-info supplemental-record-element)]
     (when (or (seq (:casn1name record-info))
               (seq (intersection (:semantic-type-list record-info)
