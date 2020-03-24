@@ -1,6 +1,6 @@
 (ns chem.annotations
-  (:use [clojure.set])
-  (:require [clojure.string :as string]))
+  (:require [clojure.set :refer :all]
+            [clojure.string :as string]))
 
 (defn annotate-text-using-spans
   "Given document and spans annotate document for display.
