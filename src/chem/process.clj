@@ -1,8 +1,6 @@
 (ns chem.process
   (:require [clojure.java.io :as io]
-            ;; [metamap-api.metamap-api :as mm-api]
             [chem.annotations :as annot]
-            ;; [chem.metamap-annotation :as mm-annot]
             [skr.tokenization :as mm-tokenization]
             [chem.semtypes :as semtypes]
             [chem.partial :as partial]
@@ -20,22 +18,7 @@
   {:prefix-or-suffix {:func (fn [document]
                               (let [result (partial/prefix-or-suffix-match document)]
                                 (conj result {:spans (map #(:span %) (:annotations result))})))
-                      :label "IUPAC Prefix or Suffix Match"}
-   ;; :metamap {:func (fn [document]
-   ;;                   (let [mmapi-inst (mm-api/api-instantiate)]
-   ;;                     (mm-annot/annotate-document mmapi-inst document)))
-   ;;           :label "MetaMap"}
-   })
-
-;; (defonce disabled-engines
-;;  {
-   ;; :token-enhanced {:func (fn [document]
-   ;;                          (let [mmapi-inst (mm-api/api-instantiate)]
-   ;;                            (mm-annot/get-enhanced-annotations
-   ;;                             mmapi-inst 
-   ;;                             (:annotations (mm-tokenization/gen-token-annotations document)))))
-   ;;                  :label "Token Enchanced"}
-;;   })
+                      :label "IUPAC Prefix or Suffix Match"}})
 
 (def ^:dynamic *engine-map*
   (sorted-map
@@ -87,11 +70,6 @@
 
 (defonce ^:dynamic *doc-seq-engine-map*
   {
-   ;; :metamap (fn [document-seq]
-   ;;            (let [mmapi-inst (mm-api/api-instantiate)]
-   ;;              (map (fn [document]
-   ;;                     (mm-annot/annotate-document mmapi-inst document))
-   ;;                   document-seq)))
    :partial  (fn [document-seq]
                (map partial/match     document-seq))
    :fragment (fn [document-seq] (map partial/fragment-match    document-seq))
@@ -129,32 +107,6 @@
   ^{:doc "Add token annotations to document." }
     (conj document 
           (hash-map :token (annotate-chemdner-document mm-tokenization/gen-token-annotations document))))
-
-;; (defn add-metamap-annotations
-;;   ^{:doc "Annotate document record using MetaMap."}
-;;  ([mmapi-inst engine document]
-;;   (conj document
-;;         (hash-map (keyword engine)
-;;                   (hash-map :title-result    (mm-annot/annotate-document mmapi-inst (:title document))
-;;                             :abstract-result (mm-annot/annotate-document mmapi-inst (:abstract document))))))
-;;  ([mmapi-inst document]
-;;     (add-metamap-annotations mmapi-inst "metamap" document)))
-
-
-;; (defn regenerate-metamap-spans
-;;   "Annotate documentmap using MetaMap."
-;;  ([documentmap engine]
-;;     (conj documentmap
-;;           (hash-map (keyword engine)
-;;                     (hash-map :title-result 
-;;                               (mm-annot/regenerate-spans-and-matched-terms 
-;;                                (:annotations (:title-result (documentmap (keyword engine)))))
-;;                               :abstract-result 
-;;                               (mm-annot/regenerate-spans-and-matched-terms 
-;;                                (:annotations (:abstract-result (documentmap (keyword engine)))))))))
-;;  ([documentmap]
-;;     (regenerate-metamap-spans documentmap "metamap")))
-
 
 (defn add-partial-match-annotations 
   ^{:doc "Annotate document using chemical partial match."}
@@ -290,49 +242,6 @@
                                                              (:annotations (:abstract-result (document engine-keyword)))))))))))
           document engine-keyword-list))
 
-;; (defn generate-mm-matched-terms 
-;;   ([document]
-;;      (generate-mm-matched-terms document :metamap))
-;;   ([document engine-keyword]
-;;      (conj document 
-;;            (hash-map engine-keyword 
-;;                      (conj (document engine-keyword)
-;;                            (hash-map :title-result
-;;                                      (conj (:title-result (document engine-keyword))
-;;                                            (hash-map :matched-terms 
-;;                                                      (clojure.set/union 
-;;                                                       (mm-annot/get-matched-words-by-semtypelist
-;;                                                        (:annotations (:title-result (engine-keyword document)))
-;;                                                        semtypes/chemical-semantic-type-list))))
-;;                                      :abstract-result
-;;                                      (conj (:abstract-result (document engine-keyword))
-;;                                            (hash-map :matched-terms
-;;                                                      (mm-annot/get-matched-words-by-semtypelist
-;;                                                       (:annotations (:abstract-result (engine-keyword document)))
-;;                                                       semtypes/chemical-semantic-type-list)))))))))
-
-;; (defn flow1 [mm-annotated-document]
-;;   "Preconditions: document must have been annotated by functions
-;;    add-metamap-annotations and add-partial-match-annotations.
-
-;;    1. Apply metamap to documents filtering by semantic types
-;;       keep terms
-;;       keep User defined acronyms (UDAs)
-;;    2. Apply partial match
-;;    3. Apply normchem and remove any terms that are UDAs.
-;;    "
-;;   (merge-matched-terms :flow1-matched-terms [:partial :metamap]
-;;                        (generate-matched-terms [:partial :normchem]
-;;                                                (-> mm-annotated-document 
-;;                                                    collect-acronyms
-;;                                                    add-normchem-annotations-removing-udas
-;;                                                    generate-mm-matched-terms))))
-
-;; (defn map-flow1
-;;   "Use flow1 on documents in document sequence previously annotated by
-;;   function add-metamap-annotations."
-;;   [mm-annotated-document-seq]
-;;   (map flow1 mm-annotated-document-seq))
 
 (defn subsume-flow 
   "subsume any term span inside another term span"
@@ -367,63 +276,12 @@
   (map add-chemdner-gold-annotations
        document-seq))
 
-;; (defn add-mm-concepts-to-annotations 
-;;   ^{:doc "Augment existing annotations using MetaMap."}
-;;   ([mmapi-inst document annotation-keyword new-keyword]
-;;      (let [annot-result (document annotation-keyword)]
-;;        (conj document 
-;;              (hash-map
-;;               (keyword new-keyword)
-;;               (hash-map
-;;                :title-result
-;;                (hash-map
-;;                 :annotations
-;;                 (mm-annot/get-enhanced-annotations
-;;                  mmapi-inst    (-> annot-result :title-result :annotations)))
-;;                :abstract-result
-;;                (hash-map
-;;                 :annotations
-;;                 (mm-annot/get-enhanced-annotations
-;;                  mmapi-inst    (-> annot-result :abstract-result :annotations))))))))
-;;   ([mmapi-inst document annotation-keyword]
-;;      (add-mm-concepts-to-annotations 
-;;       mmapi-inst document
-;;       annotation-keyword (keyword (str (name annotation-keyword) "-with-mm-annotations")))))
-
-;; (defn mm-annotate-results 
-;;   "Augment annotations with MetaMap."
-;;   [token-results]
-;;   (let [mmapi-inst (mm-api/api-instantiate)]
-;;     (map (fn [result]
-;;            (hash-map :docid           (:docid result)
-;;                      :title-result    (hash-map :annotations 
-;;                                                 (mm-annot/get-enhanced-annotations
-;;                                                  mmapi-inst 
-;;                                                  (:annotations (:title-result result))))
-;;                      :abstract-result (hash-map :annotaions
-;;                                                 (mm-annot/get-enhanced-annotations
-;;                                                  mmapi-inst
-;;                                                  (:annotations (:abstract-result result))))
-;;                      :method (str (:method result) "-enhanced")))
-         
-;;          token-results)))
-
 (defn process-chemdner-document-original
   [engine document]
   (conj document 
         (hash-map engine
                   (case engine
-                    ;; :metamap (let [mmapi-inst (mm-api/api-instantiate)]
-                    ;;             (hash-map :title-result    (mm-annot/annotate-document mmapi-inst (:title document))
-                    ;;                       :abstract-result (mm-annot/annotate-document mmapi-inst (:abstract document))))
                     :token (annotate-chemdner-document mm-tokenization/gen-token-annotations engine document)
-                    ;; :token-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
-                    ;;                    (annotate-chemdner-document 
-                    ;;                     (fn [a-document]
-                    ;;                       (mm-annot/get-enhanced-annotations
-                    ;;                        mmapi-inst 
-                    ;;                        (:annotations (mm-tokenization/gen-token-annotations a-document))))
-                    ;;                     document))
                     :partial  (annotate-chemdner-document partial/match document)
                     :fragment (annotate-chemdner-document partial/fragment-match document)
                     :normchem (annotate-chemdner-document lucene-normchem/process-document document)
@@ -438,21 +296,7 @@
      Document elements contain fields mapped by the keywords :docid, :title, :abstract."
    [engine document-seq]
   (case engine
-    ;; :metamap (let [mmapi-inst (mm-api/api-instantiate)]
-    ;;             (map (fn [document]
-    ;;                    (conj document
-    ;;                          (hash-map (keyword engine)
-    ;;                                    (hash-map :title-result    (mm-annot/annotate-document mmapi-inst (:title document))
-    ;;                                              :abstract-result (mm-annot/annotate-document mmapi-inst (:abstract document))))))
-    ;;                  document-seq))
     :token (map #(annotate-chemdner-document mm-tokenization/gen-token-annotations engine %) document-seq)
-    ;; :token-enhanced (let [mmapi-inst (mm-api/api-instantiate)]
-    ;;                    (map #(conj % (annotate-chemdner-document 
-    ;;                                          (fn [document]
-    ;;                                            (mm-annot/get-enhanced-annotations
-    ;;                                             mmapi-inst 
-    ;;                                             (:annotations (mm-tokenization/gen-token-annotations document))))
-    ;;                                          engine %)) document-seq))
     :partial  (map #(conj % (annotate-chemdner-document partial/match engine %)) document-seq)
     :fragment (map #(conj % (annotate-chemdner-document partial/fragment-match engine %)) document-seq)
     :normchem (doall (map #(conj % (annotate-chemdner-document lucene-normchem/process-document engine %)) document-seq))
