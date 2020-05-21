@@ -17,7 +17,7 @@ done by symbolically linking the directories to the ones in
 chem/config and chem/data.  The "lein ring uberwar" will automatically
 copy the content of the directories to the deployment jar.
 
-## Usage
+## Socket Server Usage
 
 The command line arguments the socket server are: [hostname [port]]
 The server defaults to localhost on port 32000 unless specified.
@@ -137,6 +137,4 @@ version will probably be deprecated.
 
 ## License
 
-Copyright Â© 2013 FIXME
-
-Distributed under the Eclipse Public License, the same as Clojure.
+See [LICENSE](LICENSE.md)
