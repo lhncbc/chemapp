@@ -66,9 +66,10 @@ webapps/chemapp/data.)
 + corncob_lowercase.txt  - a file of approximately 58,000 english terms
 + ivf       - contains IRutils version of normchem database (2017)
 + lucenedb  - contains lucene version of normchem database (2015)
-+ models    - OpenNLP models
++ models    - OpenNLP and Mallet CRF models
 
-An tar bzipped archive containing the required data files is at:
+An tar bzipped archive containing these 
+data files is at:
 https://ii-public1.nlm.nih.gov/Xfer/chemappdata/chem-data.tbz.  After
 downloading, extract the archive in the chemapp directory.
 
