@@ -19,10 +19,17 @@ copy the content of the directories to the deployment jar.
 
 ## Socket Server Usage
 
+To create the socket server use the command:
+
+    lein uberjar
+
+The standalone jar file target/chem-0.1.1-SNAPSHOT-standalone.jar will
+be generated.
+
 The command line arguments the socket server are: [hostname [port]]
 The server defaults to localhost on port 32000 unless specified.
 
-    $ java -jar chem-0.1.0-standalone.jar [args]
+    $ java -jar target/chem-0.1.1-SNAPSHOT-standalone.jar [args]
 
 ## Caveats
 
@@ -56,11 +63,14 @@ tomcat) or in some cases it must be deployed with the servlet and
 resides in the servlet deployment directory (for instance:
 webapps/chemapp/data.)
 
-    corncob_lowercase.txt  - a file 
-    ivf       - contains IRutils version of normchem database (2017)
-    lucenedb  - contains lucene version of normchem database (2015)
-    models    - OpenNLP models
++ corncob_lowercase.txt  - a file of approximately 58,000 english terms
++ ivf       - contains IRutils version of normchem database (2017)
++ lucenedb  - contains lucene version of normchem database (2015)
++ models    - OpenNLP models
 
+An tar bzipped archive containing the required data files is at:
+https://ii-public1.nlm.nih.gov/Xfer/chemappdata/chem-data.tbz.  After
+downloading, extract the archive in the chemapp directory.
 
 ## Examples
 
@@ -70,32 +80,32 @@ combine5|Down-regulation of the expression of alcohol dehydrogenase 4 and CYP2E1
 
 ### Response
 
-alcohol|C091419|37,44;471,478|
-CYP2E1|D001141|65,71;680,686;1174,1180|
-α-endosulfan|D004726|94,106;1195,1207|
-dioxin|D013749|111,117;924,930|
-tetrachlorodibenzo-p-dioxin|D013749|307,334|
-TCDD|D013749|336,340;548,552;1132,1136|
-organochlorine||350,364|
-CAR|C024888|948,951|
-estrogen||956,964|
-EOF
+    alcohol|C091419|37,44;471,478|
+    CYP2E1|D001141|65,71;680,686;1174,1180|
+    α-endosulfan|D004726|94,106;1195,1207|
+    dioxin|D013749|111,117;924,930|
+    tetrachlorodibenzo-p-dioxin|D013749|307,334|
+    TCDD|D013749|336,340;548,552;1132,1136|
+    organochlorine||350,364|
+    CAR|C024888|948,951|
+    estrogen||956,964|
+    EOF
 
 ## Mallet
 
-see scripts/setup.clj, src/chem/setup.clj, src/chem/paths.clj and 
+See scripts/setup.clj, src/chem/setup.clj, src/chem/paths.clj and 
 src/chem/mallet.clj for information on generating features.
 
-scripts/setup.clj       -
-scripts/setupscript.clj -
-scripts/
++ scripts/setup.clj       -
++ scripts/setupscript.clj -
++ scripts/
 
-src/chem/setup.clj      - loads development and training corpori into memory
-src/chem/paths.clj      - file paths to training and development corpori
-src/chem/mallet.clj     - convience functions for mallet.
++ src/chem/setup.clj      - loads development and training corpora into memory
++ src/chem/paths.clj      - file paths to training and development corpori
++ src/chem/mallet.clj     - convenience functions for mallet.
 
 
-### running mallet 
+### Running Mallet 
 
 Training
 ========
@@ -107,22 +117,22 @@ java -cp /usr/local/pub/machinelearning/mallet-2.0.7/class:/usr/local/pub/machin
 Testing
 =======
 
-java -cp /usr/local/pub/machinelearning/mallet-2.0.7/class:/usr/local/pub/machinelearning/mallet-2.0.7/lib/mallet-deps.jar \
-    cc.mallet.fst.SimpleTagger
+    java -cp /usr/local/pub/machinelearning/mallet-2.0.7/class:/usr/local/pub/machinelearning/mallet-2.0.7/lib/mallet-deps.jar \
+      cc.mallet.fst.SimpleTagger
 
 ## Evaluation
 
 To evaluate using training-set for testing:
 
-bc-evaluate chemdner-resultlist.txt /nfsvol/nlsaux16/II\_Group\_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER\_TRAIN\_V01/cdi\_ann\_training\_13-07-31.txt
+    bc-evaluate chemdner-resultlist.txt /nfsvol/nlsaux16/II\_Group\_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER\_TRAIN\_V01/cdi\_ann\_training\_13-07-31.txt
 
 To evaluate using development-set for testing:
 
-bc-evaluate chemdner-resultlist.txt /nfsvol/nlsaux16/II\_Group\_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER\_DEVELOPMENT\_V02/cdi\_ann\_development_13-08-18.txt
+    bc-evaluate chemdner-resultlist.txt /nfsvol/nlsaux16/II\_Group\_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER\_DEVELOPMENT\_V02/cdi\_ann\_development_13-08-18.txt
 
 To evaluate:
 
-bc-evaluate subsume-chemdner-resultlist.txt /nfsvol/nlsaux16/II\_Group\_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER\_TRAIN\_V01/cdi\_ann\_training_13-07-31.txt
+    bc-evaluate subsume-chemdner-resultlist.txt /nfsvol/nlsaux16/II\_Group\_WorkArea/Lan/projects/BioCreative/2013/CHEMDNER\_TRAIN\_V01/cdi\_ann\_training_13-07-31.txt
 
   
 ### Bugs
@@ -130,10 +140,6 @@ bc-evaluate subsume-chemdner-resultlist.txt /nfsvol/nlsaux16/II\_Group\_WorkArea
 The NormChem dictionary using Lucene indexes is currently broken.  The
 IRUtils dictionary currently provides the same function so the Lucene
 version will probably be deprecated.
-
-### Any Other Sections
-### That You Think
-### Might be Useful
 
 ## License
 
