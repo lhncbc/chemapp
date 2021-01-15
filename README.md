@@ -49,9 +49,11 @@ Transformers.  These could probably be added using Neanderthal
 (https://neanderthal.uncomplicate.org/) or
 (https://aria42.com/blog/2017/11/Flare-Clojure-Neural-Net)
 
-## Options
+## Socket Server Arguments
 
-FIXME: listing of options this app accepts.
+The socket server accepts hostname and port or just the hostname in
+which case it uses the port 32000.  If no arguments are supplied then
+port 32000 on localhost (127.0.0.1) is used.
 
 ## External Data (Mostly indexes)
 
