@@ -5,6 +5,7 @@
             [hiccup.util :refer :all]
             [clojure.tools.logging :as log]
             [hiccup.middleware :refer [wrap-base-url]]
+            [hiccup.util :refer [escape-html]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.middleware.multipart-params :refer :all]
             [chem.html-views :refer :all]
@@ -94,24 +95,24 @@
   (POST "/adhoc/json/" [document engine]
     (log/debug "document: " document ", engine:" engine)
     (json-views/adhoc-output document (if (nil? engine)
-                                        "combine5"
-                                        engine)))
+                                                      "combine5"
+                                                      engine)))
 
   (POST "/adhoc/piped/" [document engine] 
     (log/debug "document: " document ", engine:" engine)
     (piped-views/adhoc-output document (if (nil? engine)
-                                         "combine5"
-                                         engine)))
+                                                       "combine5"
+                                                       engine)))
 
   (POST "/adhoc/process/" [document engine]
     (log/debug "document: " document ", engine:" engine)
     (fn [req]
-      (view-adhoc-output req document engine (process/process
-                                              (if (nil? engine)
+      (view-adhoc-output req (escape-html document) engine
+                         (process/process (if (nil? engine)
                                                 "combine5"
                                                 engine)
-                                              document))))
-
+                                          document))))
+    
     (resources "/")
  )
 
